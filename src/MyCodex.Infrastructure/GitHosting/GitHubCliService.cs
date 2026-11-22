@@ -94,16 +94,58 @@ namespace MyCodex.Infrastructure.GitHosting
             _commandRunner.StartInteractiveLogin();
         }
 
-        public async Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
+        public Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
             string keyword,
             int limit,
             CancellationToken cancellationToken)
         {
-            var normalizedLimit = limit <= 0 ? 100 : Math.Min(limit, 200);
-            var arguments = string.Format(
-                "repo list --limit {0} --json nameWithOwner,description,visibility,isPrivate,defaultBranchRef,updatedAt,createdAt,pushedAt,url,sshUrl,diskUsage,primaryLanguage,stargazerCount,forkCount,watchers,homepageUrl,licenseInfo,isArchived,isFork",
-                normalizedLimit);
-            var result = await RunGhAsync(arguments, cancellationToken).ConfigureAwait(false);
+            return ListRepositoriesAsync("OWNER,COLLABORATOR,ORGANIZATION_MEMBER", keyword, limit, cancellationToken);
+        }
+
+        private async Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
+            string affiliations,
+            string keyword,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            var normalizedLimit = NormalizeLimit(limit, 100, 200);
+            var filter = TextValueHelper.TrimToNull(keyword);
+            var repositories = new List<GitHubRepositoryEntry>();
+            string after = null;
+            do
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var pageSize = filter == null ? Math.Min(100, normalizedLimit - repositories.Count) : 100;
+                var page = await ReadRepositoryPageAsync(affiliations, pageSize, after, cancellationToken).ConfigureAwait(false);
+                var matches = JsonValueReader.GetArray(page, "nodes")
+                    .OfType<Dictionary<string, object>>()
+                    .Select(ParseRepository)
+                    .Where(repo => filter == null || Contains(repo.NameWithOwner, filter) || Contains(repo.Description, filter));
+                repositories.AddRange(matches.Take(normalizedLimit - repositories.Count));
+                var pageInfo = JsonValueReader.GetDictionary(page, "pageInfo");
+                after = JsonValueReader.GetBool(pageInfo, "hasNextPage") ? JsonValueReader.GetString(pageInfo, "endCursor") : null;
+            }
+            while (!string.IsNullOrEmpty(after) && repositories.Count < normalizedLimit);
+
+            return repositories;
+        }
+
+        private async Task<Dictionary<string, object>> ReadRepositoryPageAsync(
+            string affiliations, int pageSize, string after, CancellationToken cancellationToken)
+        {
+            var query = "query($size:Int!,$after:String){viewer{repositories(first:$size,after:$after," +
+                "ownerAffiliations:[" + affiliations + "],orderBy:{field:PUSHED_AT,direction:DESC}){" +
+                "pageInfo{hasNextPage endCursor} nodes{nameWithOwner description visibility isPrivate defaultBranchRef{name} " +
+                "updatedAt createdAt pushedAt url sshUrl diskUsage primaryLanguage{name} stargazerCount forkCount " +
+                "watchers{totalCount} homepageUrl licenseInfo{spdxId name} isArchived isFork}}}}";
+            var arguments = new List<string> { "api", "graphql", "-f", "query=" + query, "-F", "size=" + pageSize, "--jq", ".data.viewer.repositories" };
+            if (after != null)
+            {
+                arguments.Add("-f");
+                arguments.Add("after=" + after);
+            }
+
+            var result = await RunGhAsync(GitCommandLineBuilder.BuildArguments(arguments), cancellationToken).ConfigureAwait(false);
             if (result.ExitCode == GitHubCliCommandResult.NotFoundExitCode)
             {
                 throw new InvalidOperationException(SharedLocalization.Text("GitHubCli.Status.NotInstalled", "GitHub CLI is not installed."));
@@ -116,7 +158,7 @@ namespace MyCodex.Infrastructure.GitHosting
                     : result.StandardError.Trim()));
             }
 
-            return FilterRepositories(ParseRepositories(result.StandardOutput), keyword);
+            return Deserialize(result.StandardOutput);
         }
 
         public async Task<GitHubRepositorySearchResult> SearchRepositoriesAsync(
@@ -142,7 +184,7 @@ namespace MyCodex.Infrastructure.GitHosting
             int limit,
             CancellationToken cancellationToken)
         {
-            var repositories = await ListRepositoriesAsync(keyword, limit, cancellationToken).ConfigureAwait(false);
+            var repositories = await ListRepositoriesAsync("OWNER", keyword, limit, cancellationToken).ConfigureAwait(false);
             return repositories
                 .Where(IsEmptyRepository)
                 .ToArray();
@@ -769,23 +811,6 @@ namespace MyCodex.Infrastructure.GitHosting
             return _serializer.DeserializeObject(json) as object[] ?? new object[0];
         }
 
-        private IReadOnlyList<GitHubRepositoryEntry> ParseRepositories(string json)
-        {
-            var entries = new List<GitHubRepositoryEntry>();
-            foreach (var item in DeserializeArray(json))
-            {
-                var source = item as Dictionary<string, object>;
-                if (source == null)
-                {
-                    continue;
-                }
-
-                entries.Add(ParseRepository(source));
-            }
-
-            return entries;
-        }
-
         private GitHubRepositorySearchResult ParseRepositorySearchResult(string json)
         {
             var source = Deserialize(NormalizeSearchResponseJson(json));
@@ -1372,39 +1397,6 @@ namespace MyCodex.Infrastructure.GitHosting
             });
             var result = await RunGhAsync(arguments, cancellationToken).ConfigureAwait(false);
             EnsureGhSuccess(result);
-        }
-
-        private static IReadOnlyList<GitHubRepositoryEntry> FilterRepositories(
-            IReadOnlyList<GitHubRepositoryEntry> repositories,
-            string keyword)
-        {
-            if (repositories == null)
-            {
-                return new List<GitHubRepositoryEntry>();
-            }
-
-            if (string.IsNullOrWhiteSpace(keyword))
-            {
-                return repositories;
-            }
-
-            var filter = keyword.Trim();
-            var result = new List<GitHubRepositoryEntry>();
-            foreach (var repository in repositories)
-            {
-                if (repository == null)
-                {
-                    continue;
-                }
-
-                if (Contains(repository.NameWithOwner, filter) ||
-                    Contains(repository.Description, filter))
-                {
-                    result.Add(repository);
-                }
-            }
-
-            return result;
         }
 
         private static string ParseVersion(string output)

@@ -204,6 +204,42 @@ namespace MyCodex.Application.Tests
         }
 
         [Test]
+        public async Task ListRepositories_IncludesOrganizationAndCollaboratorMatchesAcrossPages()
+        {
+            var runner = new CapturingGitHubCliCommandRunner();
+            runner.Pages.Enqueue(@"{""nodes"":[{""nameWithOwner"":""me/other""},{""nameWithOwner"":""me/demo""}],
+                ""pageInfo"":{""hasNextPage"":true,""endCursor"":""next==""}}");
+            runner.Pages.Enqueue(@"{""nodes"":[{""nameWithOwner"":""org/demo"",""defaultBranchRef"":{""name"":""main""}},
+                {""nameWithOwner"":""friend/project"",""description"":""A demo"",""sshUrl"":""git@github.com:friend/project.git""},
+                {""nameWithOwner"":""other/demo""}],""pageInfo"":{""hasNextPage"":false}}");
+
+            var repositories = await new GitHubCliService(runner).ListRepositoriesAsync("DEMO", 3, CancellationToken.None);
+
+            var arguments = GitHubCliArgumentParser.Split(runner.Arguments);
+            Assert.That(arguments, Does.Contain("graphql"));
+            Assert.That(arguments.Single(arg => arg.StartsWith("query=", StringComparison.Ordinal)),
+                Does.Contain("ownerAffiliations:[OWNER,COLLABORATOR,ORGANIZATION_MEMBER]"));
+            Assert.That(arguments, Does.Contain("after=next=="));
+            Assert.That(repositories.Select(repo => repo.NameWithOwner),
+                Is.EqualTo(new[] { "me/demo", "org/demo", "friend/project" }));
+            Assert.That(repositories[1].DefaultBranch, Is.EqualTo("main"));
+            Assert.That(repositories[2].SshUrl, Is.EqualTo("git@github.com:friend/project.git"));
+        }
+
+        [Test]
+        public async Task ListEmptyRepositories_StillQueriesOnlyOwnedRepositoriesForPublishing()
+        {
+            var runner = new CapturingGitHubCliCommandRunner();
+            runner.Pages.Enqueue(@"{""nodes"":[{""nameWithOwner"":""me/empty"",""diskUsage"":0},
+                {""nameWithOwner"":""me/used"",""defaultBranchRef"":{""name"":""main""}}],""pageInfo"":{""hasNextPage"":false}}");
+
+            var repositories = await new GitHubCliService(runner).ListEmptyRepositoriesAsync(null, 100, CancellationToken.None);
+
+            Assert.That(runner.Arguments, Does.Contain("ownerAffiliations:[OWNER]"));
+            Assert.That(repositories.Select(repo => repo.NameWithOwner), Is.EqualTo(new[] { "me/empty" }));
+        }
+
+        [Test]
         public void GitHubCliService_ArchiveRepository_RunsExplicitRepositoryCommand()
         {
             var runner = new CapturingGitHubCliCommandRunner();
@@ -727,6 +763,8 @@ namespace MyCodex.Application.Tests
 
         private sealed class CapturingGitHubCliCommandRunner : IGitHubCliCommandRunner
         {
+            public Queue<string> Pages { get; } = new Queue<string>();
+
             public GitHubCliCommandResult Result { get; set; }
 
             public string Arguments { get; private set; }
@@ -737,7 +775,7 @@ namespace MyCodex.Application.Tests
                 return Task.FromResult(Result ?? new GitHubCliCommandResult
                 {
                     ExitCode = 0,
-                    StandardOutput = string.Empty,
+                    StandardOutput = Pages.Count > 0 ? Pages.Dequeue() : string.Empty,
                     StandardError = string.Empty
                 });
             }
