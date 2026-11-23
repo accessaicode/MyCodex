@@ -14,10 +14,12 @@ namespace MyCodex.WinForms.Forms
             try
             {
                 var snapshot = await Task.Run(() => client.ReadAsync(cancellationToken), cancellationToken);
-                if (!cancellationToken.IsCancellationRequested && isCurrentTarget() &&
-                    (snapshot.LiveState == "unavailable" || !string.IsNullOrEmpty(snapshot.SyncError)))
+                if (!cancellationToken.IsCancellationRequested && isCurrentTarget())
                 {
-                    showStatus(AuthenticationCenterUiText.LiveStatus(snapshot, string.Empty).Trim());
+                    if (snapshot.LiveState == "unavailable" || !string.IsNullOrEmpty(snapshot.SyncError))
+                        showStatus(AuthenticationCenterUiText.LiveStatus(snapshot, string.Empty).Trim());
+                    else if (snapshot.BackendUpdateAvailable)
+                        showStatus(AuthenticationCenterUiText.BackendUpdateNote());
                 }
             }
             catch (OperationCanceledException) { }

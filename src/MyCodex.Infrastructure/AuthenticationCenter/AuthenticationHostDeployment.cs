@@ -100,7 +100,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             "  rm -rf \"$failed\"\n" +
             "else exit 18; fi");
 
-        private static string InPosixShell(string script)
+        internal static string InPosixShell(string script)
         {
             // Keep the configured login shell's environment, but use POSIX glob and trap semantics.
             return "exec /bin/sh -c " + RemoteSshCommandLine.QuoteRemoteShellArgument(script) + " \"$0\" \"$@\"";
@@ -115,7 +115,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
         }
 
         internal static async Task<AuthenticationHostRelease.Archive> ProbeRemoteAsync(
-            RemoteMacSshConfigSnapshot config, RemoteSshCommandExecutor executor, CancellationToken token)
+            RemoteMacSshConfigSnapshot config, IRemoteSshCommandExecutor executor, CancellationToken token)
         {
             var result = await executor.ExecuteAsync(config, ProbeScript, "mycodex-auth-probe", 30000, token).ConfigureAwait(false);
             if (result.ExitCode != 0) throw new AuthenticationCenterException(result.ExitCode == 19 ? "invalid_codex_home" : "backend_probe_failed");
@@ -167,7 +167,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
         }
 
         internal static async Task InstallRemoteAsync(RemoteMacSshConfigSnapshot config,
-            RemoteSshCommandExecutor executor, AuthenticationHostRelease.Archive archive, bool update, CancellationToken token,
+            IRemoteSshCommandExecutor executor, AuthenticationHostRelease.Archive archive, bool update, CancellationToken token,
             string verifiedBase64 = null)
         {
             var input = verifiedBase64 ?? await AuthenticationHostRelease.ReadVerifiedBase64Async(archive, token).ConfigureAwait(false);
@@ -190,7 +190,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             if (result.ExitCode != 0) throw new AuthenticationCenterException("backend_update_unsafe");
         }
 
-        internal static async Task FinalizeRemoteAsync(RemoteMacSshConfigSnapshot config, RemoteSshCommandExecutor executor,
+        internal static async Task FinalizeRemoteAsync(RemoteMacSshConfigSnapshot config, IRemoteSshCommandExecutor executor,
             AuthenticationHostRelease.Archive archive, bool rollback, CancellationToken token)
         {
             var result = await executor.ExecuteAsync(config, FinalizeScript, "mycodex-auth-finalize", 30000,

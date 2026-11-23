@@ -417,6 +417,51 @@ namespace MyCodex.Application.Tests
             }
         }
 
+        [Test]
+        public async Task CompatibleOlderBackendOffersAnUpdateWithoutTakingFocus()
+        {
+            var client = new FakeClient { BackendUpdateAvailable = true };
+            client.Providers.Add(Provider("a"));
+            var reader = new Reader();
+            ErrorBoxRecorder.Clear();
+            using (var form = new AuthenticationCenterForm(client, reader,
+                updateBackend: token =>
+                {
+                    client.BackendUpdateAvailable = false;
+                    return Task.CompletedTask;
+                }))
+            {
+                form.Show();
+                await form.RefreshAsync();
+                var list = FormTestDriver.Field<ListView>(form, "_providersList");
+                var button = FormTestDriver.Field<Button>(form, "_updateBackendButton");
+                Assert.That(button.Visible && button.Enabled, Is.True);
+                Assert.That(list.Items.Count, Is.EqualTo(1));
+                Assert.That(FormTestDriver.Field<Button>(form, "_addButton").Enabled, Is.True);
+                Assert.That(form.ActiveControl, Is.Not.SameAs(button));
+                Assert.That(FormTestDriver.Field<Label>(form, "_statusLabel").Text,
+                    Does.Contain(AuthenticationCenterUiText.BackendUpdateNote()));
+                Assert.That(ErrorBoxRecorder.Messages, Is.Empty);
+                await form.UpdateBackendAsync();
+                Assert.That(button.Visible, Is.False);
+                Assert.That(reader.SpeakCalls, Is.Zero);
+            }
+        }
+
+        [Test]
+        public async Task NewerBackendExplainsTheAppUpdateAndOffersNoBackendUpdate()
+        {
+            var client = new FakeClient { Failure = new AuthenticationCenterException("backend_newer_than_app") };
+            using (var form = new AuthenticationCenterForm(client, null, updateBackend: token => throw new AssertionException("downgrade")))
+            {
+                form.Show();
+                await form.RefreshAsync();
+                Assert.That(FormTestDriver.Field<Button>(form, "_updateBackendButton").Visible, Is.False);
+                Assert.That(FormTestDriver.Field<Label>(form, "_statusLabel").Text,
+                    Does.Contain("MyCodex").And.Not.Contain("backend_newer_than_app"));
+            }
+        }
+
         [TestCase(true)]
         [TestCase(false)]
         public void RouteHealthIsVisibleWithoutSpeakingOrApplying(bool running)
@@ -1161,6 +1206,7 @@ namespace MyCodex.Application.Tests
             internal AuthenticationProviderEdit LastEdit;
             internal bool RouteRequired, RouterRunning, SupportsSessionHistory, SupportsAggregation, Aggregating;
             internal string SyncError;
+            internal bool BackendUpdateAvailable;
             internal bool SupportsInactiveSaveWhileBusy, SupportsProviderOrdering, SupportsProviderUsage;
             internal List<string> LastOrder;
             internal Exception ReorderFailure;
@@ -1173,7 +1219,7 @@ namespace MyCodex.Application.Tests
                     throw Failure;
                 }
                 if (ReadReply != null) return ReadReply.Task;
-                return Task.FromResult(new AuthenticationCenterSnapshot { TargetName = "Test", CodexHome = "test-home", CurrentProviderId = Current, Providers = Providers.ToList(), RouteRequired = RouteRequired, RouterRunning = RouterRunning, RouteInFlight = 3, SupportsSessionHistory = SupportsSessionHistory, SupportsAggregation = SupportsAggregation, Aggregating = Aggregating, SyncError = SyncError, SupportsInactiveSaveWhileBusy = SupportsInactiveSaveWhileBusy, SupportsProviderOrdering = SupportsProviderOrdering, SupportsProviderUsage = SupportsProviderUsage });
+                return Task.FromResult(new AuthenticationCenterSnapshot { TargetName = "Test", CodexHome = "test-home", CurrentProviderId = Current, Providers = Providers.ToList(), RouteRequired = RouteRequired, RouterRunning = RouterRunning, RouteInFlight = 3, SupportsSessionHistory = SupportsSessionHistory, SupportsAggregation = SupportsAggregation, Aggregating = Aggregating, SyncError = SyncError, SupportsInactiveSaveWhileBusy = SupportsInactiveSaveWhileBusy, SupportsProviderOrdering = SupportsProviderOrdering, SupportsProviderUsage = SupportsProviderUsage, BackendUpdateAvailable = BackendUpdateAvailable });
             }
 
             public Task<AuthenticationProvider> SaveAsync(AuthenticationProviderEdit edit, CancellationToken cancellationToken)

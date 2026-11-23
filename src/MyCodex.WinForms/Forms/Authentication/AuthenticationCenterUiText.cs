@@ -173,6 +173,8 @@ namespace MyCodex.WinForms.Forms
                     return UiLocalization.Text("AuthenticationCenter.Error.ResidentBackendVersion", "A different authentication backend is still running and could not be safely replaced. Finish sign-in and active tasks, close other MyCodex installations using this Codex home, then retry Refresh. The existing backend was not forcibly stopped.");
                 case "backend_update_available":
                     return UiLocalization.Text("AuthenticationCenter.Error.BackendUpdateAvailable", "This target has an older authentication backend. Choose Update backend to install the version required by MyCodex.");
+                case "backend_newer_than_app":
+                    return UiLocalization.Text("AuthenticationCenter.Error.BackendNewer", "This target's authentication backend is newer than this MyCodex. Update MyCodex to manage authentication here. The backend was left unchanged.");
                 case "backend_download_failed":
                     return UiLocalization.Text("AuthenticationCenter.Error.BackendDownload", "The authentication backend could not be downloaded from GitCode. Check the connection and retry Refresh. Existing files were kept.");
                 case "backend_dependencies_missing":
@@ -291,6 +293,11 @@ namespace MyCodex.WinForms.Forms
         }
 
         // Automatic capture of the global configuration failed; null when it succeeded.
+        internal static string BackendUpdateNote()
+        {
+            return UiLocalization.Text("AuthenticationCenter.Status.BackendUpdateOptional", "A backend update is available for this target. The installed version still works; for the latest fixes and features, choose Update backend in Authentication Center.");
+        }
+
         internal static string SyncErrorText(AuthenticationCenterSnapshot snapshot)
         {
             if (string.IsNullOrEmpty(snapshot.SyncError))

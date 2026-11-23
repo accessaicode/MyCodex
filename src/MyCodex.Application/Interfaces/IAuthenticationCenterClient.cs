@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MyCodex.Application.DTOs;
+using MyCodex.Shared.Localization;
 
 namespace MyCodex.Application.Interfaces
 {
@@ -50,7 +51,10 @@ namespace MyCodex.Application.Interfaces
 
     public sealed class AuthenticationCenterException : Exception
     {
-        public AuthenticationCenterException(string code) : base(code)
+        // Connection failures display Message, so the code that stops App Server from starting carries readable text.
+        public AuthenticationCenterException(string code) : base(code != "provider_recovery_required" ? code :
+            SharedLocalization.Text("SessionProvider.Error.RecoveryRequired",
+                "An earlier conversation repair has not finished, so Codex was not started to protect that history. Open Authentication Center, refresh or update the backend, then reconnect."))
         {
             Code = code;
         }

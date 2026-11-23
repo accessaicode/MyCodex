@@ -23,6 +23,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
         private readonly Func<string, IDictionary<string, object>, CancellationToken, Task<IDictionary<string, object>>> _request;
         private Func<CancellationToken, Task> _updateBackend;
         internal Func<string, Task> CredentialDiagnostics { get; set; }
+        internal Func<Task<bool>> PendingMigrationCheck { get; set; }
 
         public bool CanUpdateBackend => _updateBackend != null;
 
@@ -86,7 +87,10 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
         {
             var transport = string.Equals(runtimeSource, CodexRuntimeSources.Wsl, StringComparison.OrdinalIgnoreCase) ||
                 CodexRuntimeSources.IsRemoteUnixSsh(runtimeSource) ? new LocalAuthenticationHost(runtimeSource) : LocalHost.Value;
-            var client = new AuthenticationCenterClient("Windows", transport.RequestAsync, localWindows: true);
+            var client = new AuthenticationCenterClient("Windows", transport.RequestAsync, localWindows: true)
+            {
+                PendingMigrationCheck = transport.HasPendingMigrationAsync
+            };
             if (readDiagnosticConfig != null)
                 client.CredentialDiagnostics = trigger => CollectWindowsCredentialDiagnosticsAsync(trigger, readDiagnosticConfig, legacyDataRoot, transport.CodexHome);
             return client;
@@ -131,7 +135,8 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             var distribution = config != null ? config.DistributionName : WslAppServerConfigSnapshot.DefaultDistributionName;
             return new AuthenticationCenterClient("WSL: " + distribution, transport.RequestAsync)
             {
-                _updateBackend = transport.UpdateAsync
+                _updateBackend = transport.UpdateAsync,
+                PendingMigrationCheck = transport.HasPendingMigrationAsync
             };
         }
 
@@ -141,7 +146,8 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             var target = config == null ? string.Empty : config.HostName;
             return new AuthenticationCenterClient("SSH: " + target, transport.RequestAsync)
             {
-                _updateBackend = transport.UpdateAsync
+                _updateBackend = transport.UpdateAsync,
+                PendingMigrationCheck = transport.HasPendingMigrationAsync
             };
         }
 
@@ -200,6 +206,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                 TargetName = _targetName,
                 CodexHome = Text(status, "codexHome"),
                 HostVersion = Text(status, "hostVersion"),
+                BackendUpdateAvailable = Flag(status, "backendUpdateAvailable"),
                 SupportsContextSettings = Strings(status, "capabilities")?.Contains("contextSettings") == true,
                 SupportsConfigEditing = Strings(status, "capabilities")?.Contains("configEditing") == true,
                 SupportsFullConfigEditor = Strings(status, "capabilities")?.Contains("fullConfigEditor") == true,

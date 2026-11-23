@@ -54,6 +54,18 @@ namespace MyCodex.Application.Tests
         }
 
         [Test]
+        public async Task CompatibleOlderBackendMentionsTheOptionalUpdate()
+        {
+            var client = new AuthenticationCenterClient("SSH: Linux", (method, values, token) =>
+                Task.FromResult<IDictionary<string, object>>(method == "status"
+                    ? new Dictionary<string, object> { { "protocolVersion", 3 }, { "route", new Dictionary<string, object>() }, { "backendUpdateAvailable", true } }
+                    : new Dictionary<string, object> { { "providers", new object[0] } }));
+            var shown = new List<string>();
+            await AuthenticationCaptureOnConnect.RunAsync(client, () => true, shown.Add, CancellationToken.None);
+            Assert.That(shown, Is.EqualTo(new[] { AuthenticationCenterUiText.BackendUpdateNote() }));
+        }
+
+        [Test]
         public async Task CancellationDoesNotPublishOrSendCapture()
         {
             using (var cancellation = new CancellationTokenSource())

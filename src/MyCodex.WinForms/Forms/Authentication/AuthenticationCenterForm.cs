@@ -316,7 +316,7 @@ namespace MyCodex.WinForms.Forms
                 _loaded = true;
                 if (queryUsage)
                     QueryUsage(snapshot.Providers.Where(p => _supportsProviderUsage && p.UsageEnabled).Select(p => p.Id), true);
-                _updateAvailable = false;
+                _updateAvailable = snapshot.BackendUpdateAvailable;
                 var routeError = !snapshot.RouteRequired ? null
                     : !snapshot.ManualRestartRequired && !snapshot.StartupRecoveryReady
                         ? AuthenticationCenterUiText.Error(new AuthenticationCenterException("startup_registration_failed"))
@@ -335,6 +335,7 @@ namespace MyCodex.WinForms.Forms
                 if (IsDisposed) return;
                 readyStatus = AuthenticationCenterUiText.LiveStatus(snapshot, readyStatus);
                 if (aggregationNote != null) readyStatus += " " + aggregationNote;
+                if (_updateAvailable) readyStatus += " " + AuthenticationCenterUiText.BackendUpdateNote();
                 Announce(sessionHistoryNote == null ? readyStatus : readyStatus + " " + sessionHistoryNote);
                 ShowLoadError(string.Join(Environment.NewLine, new[]
                 {
@@ -365,7 +366,8 @@ namespace MyCodex.WinForms.Forms
                 if (!IsDisposed)
                 {
                     UpdateActions();
-                    if (_updateAvailable && _updateBackendButton.Visible) _updateBackendButton.Focus();
+                    // Only a required update takes the focus; an optional one must not move it on every refresh.
+                    if (!_loaded && _updateAvailable && _updateBackendButton.Visible) _updateBackendButton.Focus();
                 }
             }
         }

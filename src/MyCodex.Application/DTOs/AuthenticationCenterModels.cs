@@ -101,6 +101,8 @@ namespace MyCodex.Application.DTOs
         public string TargetName { get; set; }
         public string CodexHome { get; set; }
         public string HostVersion { get; set; }
+        // The installed backend works, and a newer pinned release can replace it.
+        public bool BackendUpdateAvailable { get; set; }
         public bool SupportsContextSettings { get; set; }
         public bool SupportsConfigEditing { get; set; }
         public bool SupportsFullConfigEditor { get; set; }

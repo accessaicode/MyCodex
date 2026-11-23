@@ -13096,6 +13096,12 @@ MyCodex 桌面客户端。</value>
   <data name="AuthenticationCenter.Status.UpdatingBackend" xml:space="preserve">
     <value>正在检查进行中的请求并更新目标后台…</value>
   </data>
+  <data name="AuthenticationCenter.Status.BackendUpdateOptional" xml:space="preserve">
+    <value>此目标有可用的认证后台更新。当前版本仍可使用；如需最新修复和功能，请在认证中心选择“更新后台”。</value>
+  </data>
+  <data name="AuthenticationCenter.Error.BackendNewer" xml:space="preserve">
+    <value>此目标的认证后台比当前 MyCodex 新。请更新 MyCodex 后再管理此目标的认证。后台未作任何更改。</value>
+  </data>
   <data name="AuthenticationCenter.Error.BackendUpdateAvailable" xml:space="preserve">
     <value>此目标的认证后台版本较旧。请选择“更新后台”安装 MyCodex 所需版本。</value>
   </data>

@@ -1809,6 +1809,9 @@ This file is empty.</value>
   <data name="UpdateDownload.Error.Stalled" xml:space="preserve">
     <value>The download received no data for too long and was stopped.</value>
   </data>
+  <data name="SessionProvider.Error.RecoveryRequired" xml:space="preserve">
+    <value>An earlier conversation repair has not finished, so Codex was not started to protect that history. Open Authentication Center, refresh or update the backend, then reconnect.</value>
+  </data>
   <data name="SessionProvider.Error.BackendUpdate" xml:space="preserve">
     <value>Update the authentication backend to repair this conversation's old provider configuration.</value>
   </data>

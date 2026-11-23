@@ -177,6 +177,29 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             }
         }
 
+        internal Task<bool> HasPendingMigrationAsync()
+        {
+            // Does not use ResolvePaths: this also has to work when the package is missing or damaged.
+            return Task.Run(() => AuthenticationMigrationJournal.IsPending(
+                _explicitStore ?? DefaultDataDirectory(Path.GetFullPath(RequestedCodexHome()))));
+        }
+
+        private string RequestedCodexHome()
+        {
+            var home = _explicitHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
+            return string.IsNullOrWhiteSpace(home) ? LocalSessionCatalog.GetDefaultLocalCodexHomePath() : home;
+        }
+
+        private static string DefaultDataDirectory(string codexHome)
+        {
+            using (var sha = SHA256.Create())
+            {
+                var targetHash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(codexHome.TrimEnd('\\').ToUpperInvariant()))).Replace("-", string.Empty);
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "MyCodex", "auth-core", targetHash);
+            }
+        }
+
         private void UpdateStartup(IDictionary<string, object> status)
         {
             status["startupRecoveryReady"] = false;
@@ -261,11 +284,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                     "auth-core", "mycodex-auth-host.exe");
             }
             _artifact = allowOlderRelease ? AuthenticationHostArtifact.LoadForUpdate(_executable) : AuthenticationHostArtifact.Load(_executable);
-            _codexHome = _explicitHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
-            if (string.IsNullOrWhiteSpace(_codexHome))
-            {
-                _codexHome = LocalSessionCatalog.GetDefaultLocalCodexHomePath();
-            }
+            _codexHome = RequestedCodexHome();
             if (!WorkspacePathUtilities.LooksLikeWindowsDriveAbsolutePath(_codexHome) &&
                 !WorkspacePathUtilities.LooksLikeWindowsUncAbsolutePath(_codexHome))
             {
@@ -282,13 +301,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             {
                 throw new AuthenticationCenterException("invalid_codex_home");
             }
-            string targetHash;
-            using (var sha = SHA256.Create())
-            {
-                targetHash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(_codexHome.TrimEnd('\\').ToUpperInvariant()))).Replace("-", string.Empty);
-            }
-            _dataDirectory = _explicitStore ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MyCodex", "auth-core", targetHash);
+            _dataDirectory = _explicitStore ?? DefaultDataDirectory(_codexHome);
             if (!Path.IsPathRooted(_dataDirectory))
             {
                 throw new AuthenticationCenterException("invalid_data_dir");

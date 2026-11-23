@@ -33,6 +33,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
         private readonly IWslCommandExecutor _executor;
         private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
         private bool _started;
+        private bool _updateAvailable;
         private string _executable;
         private string _codexHome;
         private string _dataDirectory;
@@ -57,7 +58,9 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                     await StartAsync(cancellationToken).ConfigureAwait(false);
                     var status = await SendAsync("status", new Dictionary<string, object>(), cancellationToken).ConfigureAwait(false);
                     _artifact.ValidateIdentity(status);
-                    await AuthenticationHostRelease.CleanupCacheAsync((string)status["target"]).ConfigureAwait(false);
+                    if (!_updateAvailable)
+                        await AuthenticationHostRelease.CleanupCacheAsync((string)status["target"]).ConfigureAwait(false);
+                    status["backendUpdateAvailable"] = _updateAvailable;
                     status["startupRecoveryReady"] = false;
                     status["manualRestartRequired"] = true;
                     _started = true;
@@ -67,6 +70,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                 if (method == "status")
                 {
                     _artifact.ValidateIdentity(response);
+                    response["backendUpdateAvailable"] = _updateAvailable;
                     response["startupRecoveryReady"] = false;
                     response["manualRestartRequired"] = true;
                 }
@@ -90,6 +94,11 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             {
                 _gate.Release();
             }
+        }
+
+        internal Task<bool> HasPendingMigrationAsync()
+        {
+            return AuthenticationMigrationJournal.IsPendingWslAsync(_config, _executor);
         }
 
         internal async Task UpdateAsync(CancellationToken cancellationToken)
@@ -177,7 +186,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             throw new AuthenticationCenterException("backend_update_unsafe");
         }
 
-        private async Task ResolveAsync(CancellationToken cancellationToken, bool allowOutdatedHost = false)
+        private async Task ResolveAsync(CancellationToken cancellationToken, bool forUpdate = false)
         {
             // Check the installed host against the pinned release before running it at all.
             var serializer = new JavaScriptSerializer { MaxJsonLength = 1048576 };
@@ -207,8 +216,10 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                 outdated = true;
             }
             outdated = outdated || !AuthenticationHostRelease.IsInstalledRelease(lines[2], lines[1].Trim(), releaseArchive);
-            // A host that is not the pinned release runs only during an update, to shut it down.
-            if (outdated && !allowOutdatedHost) throw new AuthenticationCenterException("backend_update_available");
+            // Besides the pinned release, only known compatible releases serve requests.
+            // Any other host runs only during an update, to shut it down.
+            if (outdated && !forUpdate && !AuthenticationHostRelease.IsCompatibleRelease(lines[2], lines[1].Trim()))
+                throw new AuthenticationCenterException("backend_update_available");
             var paths = await _executor.ExecuteAsync(_config,
                 ResolveScript, "mycodex-auth-paths", 20000,
                 cancellationToken).ConfigureAwait(false);
@@ -224,7 +235,8 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             {
                 throw new AuthenticationCenterException("invalid_response");
             }
-            if (outdated) throw new AuthenticationCenterException("backend_update_available");
+            if (outdated && forUpdate) throw new AuthenticationCenterException("backend_update_available");
+            _updateAvailable = outdated;
             await PrepareDataDirectoryAsync(cancellationToken).ConfigureAwait(false);
         }
 

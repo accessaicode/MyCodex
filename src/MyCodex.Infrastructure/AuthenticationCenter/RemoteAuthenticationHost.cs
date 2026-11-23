@@ -47,16 +47,17 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             "set -eu\nexec \"$1\" rpc --data-dir \"$2\" --codex-home \"$3\"";
 
         private readonly RemoteMacSshConfigSnapshot _config;
-        private readonly RemoteSshCommandExecutor _executor;
+        private readonly IRemoteSshCommandExecutor _executor;
         private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
         private bool _started;
+        private bool _updateAvailable;
         private string _executable;
         private string _codexHome;
         private string _dataDirectory;
         private AuthenticationHostArtifact _artifact;
         private long _nextId;
 
-        internal RemoteAuthenticationHost(RemoteMacSshConfigSnapshot config, RemoteSshCommandExecutor executor = null)
+        internal RemoteAuthenticationHost(RemoteMacSshConfigSnapshot config, IRemoteSshCommandExecutor executor = null)
         {
             _config = config ?? new RemoteMacSshConfigSnapshot();
             _executor = executor ?? new RemoteSshCommandExecutor();
@@ -74,7 +75,9 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                     await StartAsync(cancellationToken).ConfigureAwait(false);
                     var status = await SendAsync("status", new Dictionary<string, object>(), cancellationToken).ConfigureAwait(false);
                     _artifact.ValidateIdentity(status);
-                    await AuthenticationHostRelease.CleanupCacheAsync((string)status["target"]).ConfigureAwait(false);
+                    if (!_updateAvailable)
+                        await AuthenticationHostRelease.CleanupCacheAsync((string)status["target"]).ConfigureAwait(false);
+                    status["backendUpdateAvailable"] = _updateAvailable;
                     status["startupRecoveryReady"] = false;
                     status["manualRestartRequired"] = true;
                     _started = true;
@@ -84,6 +87,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                 if (method == "status")
                 {
                     _artifact.ValidateIdentity(response);
+                    response["backendUpdateAvailable"] = _updateAvailable;
                     response["startupRecoveryReady"] = false;
                     response["manualRestartRequired"] = true;
                 }
@@ -107,6 +111,11 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             {
                 _gate.Release();
             }
+        }
+
+        internal Task<bool> HasPendingMigrationAsync()
+        {
+            return AuthenticationMigrationJournal.IsPendingRemoteAsync(_config, _executor);
         }
 
         internal async Task UpdateAsync(CancellationToken cancellationToken)
@@ -194,7 +203,7 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             throw new AuthenticationCenterException("backend_update_unsafe");
         }
 
-        private async Task ResolveAsync(CancellationToken cancellationToken, bool allowOutdatedHost = false)
+        private async Task ResolveAsync(CancellationToken cancellationToken, bool forUpdate = false)
         {
             // Check the installed host against the pinned release before running it at all.
             var serializer = new JavaScriptSerializer { MaxJsonLength = 1048576 };
@@ -225,8 +234,10 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             }
             var releaseArchive = AuthenticationHostRelease.ForTarget(lines[0].Trim(), lines[1].Trim());
             outdated = outdated || !AuthenticationHostRelease.IsInstalledRelease(lines[3], lines[2].Trim(), releaseArchive);
-            // A host that is not the pinned release runs only during an update, to shut it down.
-            if (outdated && !allowOutdatedHost) throw new AuthenticationCenterException("backend_update_available");
+            // Besides the pinned release, only known compatible releases serve requests.
+            // Any other host runs only during an update, to shut it down.
+            if (outdated && !forUpdate && !AuthenticationHostRelease.IsCompatibleRelease(lines[3], lines[2].Trim()))
+                throw new AuthenticationCenterException("backend_update_available");
             var paths = await _executor.ExecuteAsync(_config,
                 ResolveScript,
                 "mycodex-auth-paths", 30000, cancellationToken).ConfigureAwait(false);
@@ -242,7 +253,8 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
             {
                 throw new AuthenticationCenterException("invalid_response");
             }
-            if (outdated) throw new AuthenticationCenterException("backend_update_available");
+            if (outdated && forUpdate) throw new AuthenticationCenterException("backend_update_available");
+            _updateAvailable = outdated;
             await PrepareDataDirectoryAsync(cancellationToken).ConfigureAwait(false);
         }
 

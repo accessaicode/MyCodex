@@ -1809,6 +1809,9 @@
   <data name="UpdateDownload.Error.Stalled" xml:space="preserve">
     <value>下载长时间没有收到数据，已停止。</value>
   </data>
+  <data name="SessionProvider.Error.RecoveryRequired" xml:space="preserve">
+    <value>上次的会话修复尚未完成。为保护会话历史，未启动 Codex。请打开认证中心刷新或更新后台，然后重新连接。</value>
+  </data>
   <data name="SessionProvider.Error.BackendUpdate" xml:space="preserve">
     <value>请更新认证后端，以修复此旧会话的提供商配置。</value>
   </data>

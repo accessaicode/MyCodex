@@ -134,6 +134,14 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
                 {
                     throw new AuthenticationCenterException("backend_manifest_invalid");
                 }
+                if (allowDifferentRelease)
+                {
+                    // An update only ever moves a target forward, also across protocol and upstream changes.
+                    if (!Version.TryParse(Value(manifest, "hostVersion") as string, out var installed))
+                        throw new AuthenticationCenterException("backend_incompatible");
+                    if (installed > new Version(HostVersion))
+                        throw new AuthenticationCenterException("backend_newer_than_app");
+                }
                 var current = Equals(Value(manifest, "protocolVersion"), ProtocolVersion) &&
                     Equals(Value(manifest, "upstreamRevision"), UpstreamRevision);
                 var legacy = UpdatableIdentities.Any(identity => Equals(Value(manifest, "protocolVersion"), identity.Key) &&

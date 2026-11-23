@@ -142,7 +142,8 @@ namespace MyCodex.Application.Services
             return code == "version_conflict" || code == "invalid_params" || code == "invalid_mcp_config" ||
                 code == "mcp_not_found" || code == "route_requests_active" || code == "unsupported_target" ||
                 code == "mcp_not_imported" ||
-                code == "method_not_supported" || code == "backend_version_mismatch" || code == "backend_incompatible";
+                code == "method_not_supported" || code == "backend_version_mismatch" || code == "backend_incompatible" ||
+                code == "backend_newer_than_app";
         }
     }
 }
