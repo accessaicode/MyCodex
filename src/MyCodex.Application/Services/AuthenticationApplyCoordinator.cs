@@ -45,7 +45,9 @@ namespace MyCodex.Application.Services
                 }
                 catch (AuthenticationCenterException error) when (error.Code == "version_conflict" || error.Code == "config_conflict" || error.Code == "route_requests_active" ||
                     error.Code == "provider_not_found" || error.Code == "invalid_params" || error.Code == "config_backup_failed" ||
-                    error.Code == "credential_recovery_confirmation_required" || error.Code == "invalid_live_config")
+                    error.Code == "credential_recovery_confirmation_required" || error.Code == "invalid_live_config" ||
+                    error.Code == "reauth_required" || error.Code == "account_not_found" || error.Code == "account_unavailable" ||
+                    error.Code == "account_prepare_failed" || error.Code == "account_prepare_network_failed" || error.Code == "live_files_readonly")
                 {
                     // These checks run before the native switch begins.
                     throw;

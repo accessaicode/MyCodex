@@ -124,11 +124,11 @@ namespace MyCodex.WinForms.Forms
                     UiLocalization.Text(
                         "UserCenterForm.ResetCredit.Detail.Template",
                         "{0} ({1}), expires {2}. {3}"),
-                    GetDisplayText(selectedCredit.Title, selectedCredit.Id),
-                    GetDisplayText(
+                    UserCenterDetailsFormatter.GetDisplayText(selectedCredit.Title, selectedCredit.Id),
+                    UserCenterDetailsFormatter.GetDisplayText(
                         selectedCredit.ResetType,
                         UiLocalization.Text("UserCenterForm.Value.Unknown", "(Unknown)")),
-                    FormatResetTime(selectedCredit.ExpiresAtLocalTime),
+                    UserCenterDetailsFormatter.FormatResetTime(selectedCredit.ExpiresAtLocalTime),
                     selectedCredit.Description ?? string.Empty);
                 message += string.Format(
                     CultureInfo.CurrentCulture,
@@ -199,7 +199,7 @@ namespace MyCodex.WinForms.Forms
                                 "UserCenterForm.ResetCredit.Numbered.Template",
                                 "Reset credit {0}: {1}"),
                             choices.Count,
-                            FormatResetTimeWithCountdown(credit.ExpiresAtLocalTime, now))));
+                            UserCenterDetailsFormatter.FormatResetTimeWithCountdown(credit.ExpiresAtLocalTime, now))));
                 }
             }
 

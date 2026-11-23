@@ -110,12 +110,9 @@ namespace MyCodex.WinForms.Forms
         }
 
         // User Center for providers other than ChatGPT accounts: the usage their saved query reports.
-        private void ShowProviderUsage()
+        private ProviderUsageForm CreateProviderUsageForm()
         {
-            using (var form = new ProviderUsageForm(CreateCurrentAuthenticationCenterClient(), _screenReaderService))
-            {
-                form.ShowDialog(this);
-            }
+            return new ProviderUsageForm(CreateCurrentAuthenticationCenterClient(), _screenReaderService);
         }
 
         private async Task UpdateAuthenticationBackendAsync(AuthenticationCenterClient client, CancellationToken token)

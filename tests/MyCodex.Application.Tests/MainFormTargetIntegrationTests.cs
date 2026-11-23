@@ -635,9 +635,15 @@ namespace MyCodex.Application.Tests
         {
             public int ConnectCalls;
             public int RestartCalls;
+            public Func<Task> Connect;
             public Func<Task<AppServerAuthenticationState>> ReadAuthentication;
             public OfflineClient(CodexRuntimeManager runtime, IAppConfigStore config) : base(runtime, config) { }
-            public new Task ConnectAsync() { ConnectCalls++; throw new InvalidOperationException("Unexpected connection in an isolated UI test."); }
+            public new Task ConnectAsync()
+            {
+                ConnectCalls++;
+                if (Connect != null) return Connect();
+                throw new InvalidOperationException("Unexpected connection in an isolated UI test.");
+            }
             public new Task RestartAsync() { RestartCalls++; throw new InvalidOperationException("Unexpected restart in an isolated UI test."); }
             public new Task<AppServerAuthenticationState> GetAuthenticationStateAsync(bool refreshToken)
             {

@@ -174,10 +174,17 @@ namespace MyCodex.Application.Tests
         [TestCase("config_conflict")]
         [TestCase("config_backup_failed")]
         [TestCase("credential_recovery_confirmation_required")]
+        [TestCase("reauth_required")]
+        [TestCase("account_not_found")]
+        [TestCase("account_unavailable")]
+        [TestCase("account_prepare_failed")]
+        [TestCase("account_prepare_network_failed")]
+        [TestCase("live_files_readonly")]
         public void RefusedWriteDoesNotReconnectOrRetryMutation(string code)
         {
             var gate = new RuntimeOperationGate();
             var writes = 0;
+            var queries = 0;
             var client = new AuthenticationCenterClient("Test", (method, parameters, token) =>
             {
                 if (method == "gui/provider/preflight")
@@ -192,11 +199,13 @@ namespace MyCodex.Application.Tests
                     writes++;
                     throw new AuthenticationCenterException(code);
                 }
-                throw new AuthenticationCenterException("operation_not_found");
+                queries++;
+                throw new AuthenticationCenterException("operation_unknown");
             });
             var coordinator = new AuthenticationApplyCoordinator(client, gate.TryEnterTransition, () => throw new AssertionException("Must not restart."));
             Assert.That(Assert.ThrowsAsync<AuthenticationCenterException>(() => coordinator.ApplyAsync(Provider(), CancellationToken.None)).Code, Is.EqualTo(code));
             Assert.That(writes, Is.EqualTo(1));
+            Assert.That(queries, Is.Zero, "Known pre-switch failures must preserve their specific error.");
             using (var available = gate.TryEnterTransition())
             {
                 Assert.That(available, Is.Not.Null);
