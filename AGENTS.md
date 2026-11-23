@@ -9,7 +9,7 @@ These rules cover this repository only. Sibling repositories (such as `..\MyCode
 - Carry implementation tasks through relevant verification and a review of your own diff, then report what changed, what ran, and what is left. Fix failures your change causes; name pre-existing or environment failures as such.
 - Decisions live in code comments and commit messages; this repository keeps no ADR directory, glossary, or context document, and ordinary development needs no specifications, issues, sub-issues, or new labels.
 - `docs\` holds operational documentation. When a document and the current source or configuration disagree, the source wins.
-- Issue work uses `gh` against `jintonglu6688/MyCodex`. Verify labels and relationships before changing them, keep the parent when working on a child, and follow the `.github` templates for issues and PRs the user asks for.
+- Issue work uses `gh` against `accessaicode/MyCodex`. Verify labels and relationships before changing them, keep the parent when working on a child, and follow the `.github` templates for issues and PRs the user asks for.
 
 ## Working Sessions And Git Safety
 
