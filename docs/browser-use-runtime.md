@@ -4,14 +4,14 @@ MyCodex packages the reviewed external-browser runtime independently of its [nat
 
 | Component | Reviewed version |
 |---|---|
-| Runtime archive metadata | `local`, Windows x64 (ChatGPT `26.1106.6628.0`) |
-| Node | `24.22.1-cua.1` |
+| Runtime archive metadata | `local`, Windows x64 (ChatGPT `26.1117.4957.0`) |
+| Node | `24.22.3-cua.1` |
 | `@oai/browser-desktop` | `0.1.1` |
-| `@oai/cua-repl` | `0.1.3` |
+| `@oai/cua-repl` | `0.1.6` |
 
 `tools/runtime/browser-use-bundle.json` pins these versions and the SHA256 of the complete file inventory. The preparation script verifies the original Node, Node REPL and Windows helper Authenticode signatures when preparing the inventory. At application startup, `BrowserUseRuntimeBundle` verifies the pinned inventory, file sizes, every file hash, required entry points, package metadata and the absence of extra files or filesystem links.
 
-The payload uses the compact directory `runtime/browser/b3/`, with `bin/` directly below it. The bundle ID identifies a reviewed layout; component versions are in the pin and manifest. Keeping a long version directory plus an extra `cua_node/` layer caused functional JavaScript and LevelDB source paths to exceed Windows MAX_PATH in the default test build output. This layout retains all 2436 original files without pruning dependencies or changing Windows settings. Application builds copy the prepared payloads; test project references omit them. Installer preparation computes the permitted installation-root length from the actual packaged paths and rejects longer roots before maintenance.
+The payload uses the compact directory `runtime/browser/b4/`, with `bin/` directly below it. The bundle ID identifies a reviewed layout; component versions are in the pin and manifest. Keeping a long version directory plus an extra `cua_node/` layer caused functional JavaScript and LevelDB source paths to exceed Windows MAX_PATH in the default test build output. This layout retains all 2258 original files without pruning dependencies or changing Windows settings. Application builds copy the prepared payloads; test project references omit them. Installer preparation computes the permitted installation-root length from the actual packaged paths and rejects longer roots before maintenance.
 
 Prepare or verify the pinned repository payload:
 
@@ -28,6 +28,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/runtime/prepare-browse
 ```
 
 The generated payload is ignored by Git. A successful runtime verification does not establish that a browser extension is connected or that actual browser actions and permission prompts have passed acceptance testing.
+
+### Component update: 2026-11-23
+
+The browser runtime and native messaging host now come from the official ChatGPT x64 `26.1117.4957.0` client, block-map verified as recorded in the [native runtime update](computer-use-runtime.md). All browser runtime files are copied intact into bundle `b4`; its complete inventory SHA256 is `1BB5A4C8C437E51A1ECCDF51DD74BB15FB1B14799F134D1F0826EDBEB1B33365`. Node moves to `24.22.3-cua.1` and `@oai/cua-repl` to `0.1.6`; `@oai/browser-desktop` keeps `0.1.1`, but `browser-service.mjs`, `browser-client.mjs` and the browser environment instructions changed (tab cleanup notes were consolidated and a checkout capability note added). The native host comes from Chrome plugin `26.1117.41037` and uses bundle `h4` (576816 bytes, SHA256 `4948BDB0619642CA0E793940660ED4677018838003E2CAFB28213CD0877FB583`). Both official extension IDs complete the native-pipe roundtrip with it.
 
 ### Component update: 2026-11-13
 
@@ -91,7 +95,7 @@ A fresh-home Codex 0.164 integration check installs this plugin, toggles its ena
 
 Automatic bridge preparation deploys a verified copy of the original standalone native host under `%LOCALAPPDATA%\MyCodex\browser-host\h1\<generation>`, writes its Native Messaging manifest and registers it under HKCU for each installed browser requiring repair. Edge uses `Software\Microsoft\Edge\NativeMessagingHosts\com.openai.codexextension`; Chrome uses its corresponding Google/Chrome key. Each individual operation writes only its selected browser's registration and never HKLM. Each update records the old default value, its registry type and new manifest in `browser-host\backups`; failed publication restores the old value if this operation's registration is still current. A concurrent foreign update is preserved. Existing processes and their old binary files remain untouched. A browser already running when its bridge is configured may need to be fully exited and reopened once; MyCodex does not terminate it automatically.
 
-The separate `runtime/browser-host/h3/extension-host.exe` is pinned by `tools/runtime/browser-extension-host.json` (879408 bytes, SHA256 `5ADDF682A164B7FBB5ED86C507ABCA14B49364C1E1BC0E5586DEE29354725B6B`). Preparation verifies OpenAI's Authenticode signature and the exact content hash; the application verifies the embedded pin before deployment. `prepare-browser-extension-host.ps1` prepares it from the concrete reviewed Chrome plugin version or `-SourceExecutable`, and `-VerifyRoot` verifies a packaged copy. No official app or plugin cache is required on the user's machine.
+The separate `runtime/browser-host/h4/extension-host.exe` is pinned by `tools/runtime/browser-extension-host.json` (576816 bytes, SHA256 `4948BDB0619642CA0E793940660ED4677018838003E2CAFB28213CD0877FB583`). Preparation verifies OpenAI's Authenticode signature and the exact content hash; the application verifies the embedded pin before deployment. `prepare-browser-extension-host.ps1` prepares it from the concrete reviewed Chrome plugin version or `-SourceExecutable`, and `-VerifyRoot` verifies a packaged copy. No official app or plugin cache is required on the user's machine.
 
 The automation pipe is standalone. Controlled native-host tests for both official extension IDs complete a real bidirectional `getInfo` roundtrip without Node, Codex CLI, sibling `extension-host-config.json`, a V2 runtime manifest or an official desktop process. Each pipe's server PID is checked before sending fixture data. The installed real extension background also establishes this native transport without calling `codexRuntime/ensure`. The V2 manifest belongs to the separate browser sidebar App Server workflow; this installer does not configure that workflow.
 

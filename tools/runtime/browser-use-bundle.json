@@ -1,8 +1,8 @@
 {
-    "bundleId":  "b3",
+    "bundleId":  "b4",
     "runtimeVersion":  "local",
-    "nodeVersion":  "24.22.1-cua.1",
+    "nodeVersion":  "24.22.3-cua.1",
     "browserVersion":  "0.1.1",
-    "cuaReplVersion":  "0.1.3",
-    "manifestSha256":  "7CD64A6A8FD014E58F95DDB5D635F1AC6182319EA0BCE2A2BC865A5D07B32D18"
+    "cuaReplVersion":  "0.1.6",
+    "manifestSha256":  "1BB5A4C8C437E51A1ECCDF51DD74BB15FB1B14799F134D1F0826EDBEB1B33365"
 }
