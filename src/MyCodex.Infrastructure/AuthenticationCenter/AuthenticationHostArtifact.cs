@@ -12,16 +12,17 @@ namespace MyCodex.Infrastructure.AuthenticationCenter
     {
         internal const string ManifestFileName = "mycodex-auth-host.manifest.json";
         private const int ProtocolVersion = 3;
-        private const string HostVersion = "0.4.2";
-        private const string UpstreamRevision = "85ad4969b3399500baaea9d46b1e08f87aba80e1";
+        private const string HostVersion = "0.5.0";
+        private const string UpstreamRevision = "768eec9ca94db629f086e8c01ca91e2f63bb273d";
         // Earlier releases may only be replaced: 0.2.x (protocol 2, 3.x upstream),
         // 0.3.0-0.3.2 (protocol 3, v4.0.5 upstream), 0.3.3-0.3.10 (v4.0.7 upstream),
-        // and 0.3.11-0.3.12, whose upstream matches the current one.
+        // and 0.3.11-0.4.2 (v4.0.20 upstream).
         private static readonly KeyValuePair<int, string>[] UpdatableIdentities =
         {
             new KeyValuePair<int, string>(2, "e0f70019b2758f5b6b9a04dd60e4689481a0c0ac"),
             new KeyValuePair<int, string>(3, "2db86e94da13365caae55bb08d09295e31500d21"),
-            new KeyValuePair<int, string>(3, "790ed8009df809bedaf6c31b5ced05da46bb1f1f")
+            new KeyValuePair<int, string>(3, "790ed8009df809bedaf6c31b5ced05da46bb1f1f"),
+            new KeyValuePair<int, string>(3, "85ad4969b3399500baaea9d46b1e08f87aba80e1")
         };
         private readonly IDictionary<string, object> _manifest;
         private static readonly string[] IdentityFields =

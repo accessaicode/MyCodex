@@ -32,8 +32,8 @@ namespace MyCodex.Application.Tests
             }
             _manifest = new Dictionary<string, object>
             {
-                { "schemaVersion", 1 }, { "hostVersion", "0.4.2" }, { "protocolVersion", 3 },
-                { "upstreamRevision", "85ad4969b3399500baaea9d46b1e08f87aba80e1" },
+                { "schemaVersion", 1 }, { "hostVersion", "0.5.0" }, { "protocolVersion", 3 },
+                { "upstreamRevision", "768eec9ca94db629f086e8c01ca91e2f63bb273d" },
                 { "sourceRevision", new string('a', 40) }, { "sourceDirty", false },
                 { "target", "x86_64-pc-windows-msvc" }, { "executable", "mycodex-auth-host.exe" }, { "sha256", hash }
             };
@@ -142,6 +142,7 @@ namespace MyCodex.Application.Tests
         [TestCase("0.3.11", 3, "85ad4969b3399500baaea9d46b1e08f87aba80e1")]
         [TestCase("0.4.0", 3, "85ad4969b3399500baaea9d46b1e08f87aba80e1")]
         [TestCase("0.4.1", 3, "85ad4969b3399500baaea9d46b1e08f87aba80e1")]
+        [TestCase("0.4.2", 3, "85ad4969b3399500baaea9d46b1e08f87aba80e1")]
         public void OlderKnownLocalPackageCanOnlyBeLoadedForVerifiedReplacement(string version, int protocol, string upstream)
         {
             _manifest["hostVersion"] = version;
@@ -228,9 +229,9 @@ namespace MyCodex.Application.Tests
             _manifest["executable"] = "mycodex-auth-host";
             var serializer = new JavaScriptSerializer();
             var hash = (string)_manifest["sha256"];
-            _manifest["hostVersion"] = "0.4.2";
+            _manifest["hostVersion"] = "0.5.0";
             _manifest["protocolVersion"] = 3;
-            _manifest["upstreamRevision"] = "85ad4969b3399500baaea9d46b1e08f87aba80e1";
+            _manifest["upstreamRevision"] = "768eec9ca94db629f086e8c01ca91e2f63bb273d";
             var text = serializer.Serialize(_manifest);
             AuthenticationHostArtifact.LoadTarget(text, hash, target).ValidateIdentity(_manifest);
             _manifest["protocolVersion"] = 1;

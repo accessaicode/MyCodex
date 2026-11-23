@@ -16,13 +16,24 @@ namespace MyCodex.Application.Tests
     [TestFixture]
     public sealed class AuthenticationHostCompatibilityTests
     {
-        private const string Upstream = "85ad4969b3399500baaea9d46b1e08f87aba80e1";
+        private const string PreviousUpstream = "85ad4969b3399500baaea9d46b1e08f87aba80e1";
+        private const string CurrentUpstream = "768eec9ca94db629f086e8c01ca91e2f63bb273d";
+        private const string SyntheticSource = "dddddddddddddddddddddddddddddddddddddddd";
         private const string EarlierUpstream = "790ed8009df809bedaf6c31b5ced05da46bb1f1f";
         private const string LinuxX64 = "x86_64-unknown-linux-gnu";
         private const string LinuxArm = "aarch64-unknown-linux-gnu";
         private const string MacArm = "aarch64-apple-darwin";
 
+        // No released build is compatible with this app (0.5.0 moved the database schema from 23 to 27),
+        // so the mechanism is exercised with synthetic builds registered for each test.
         private static IEnumerable<TestCaseData> CompatibleReleases()
+        {
+            yield return new TestCaseData("0.4.2", SyntheticSource, LinuxX64, new string('1', 64));
+            yield return new TestCaseData("0.4.2", SyntheticSource, LinuxArm, new string('2', 64));
+            yield return new TestCaseData("0.4.2", SyntheticSource, MacArm, new string('3', 64));
+        }
+
+        private static IEnumerable<TestCaseData> FormerCompatibleReleases()
         {
             yield return new TestCaseData("0.3.11", "db8aaeb16afd633e6fc2a880a7832ef8c376154f", LinuxX64,
                 "4ff895f1c51be81ab5f3f39e992240a714697f080c4471364a07cf1230f27bf6");
@@ -48,12 +59,44 @@ namespace MyCodex.Application.Tests
                 "e2ecaf0212fa6933ea40213faea60e4cc86ec2542e6fc65437e602604a54df49");
             yield return new TestCaseData("0.4.1", "cb24120fe6d9d03e2f3998fab8a2b292e231fc8b", MacArm,
                 "393a16ccb2b9b1593432339938814add601ecd8bb4ba2bdc2f8e119318a8de0b");
+            yield return new TestCaseData("0.4.2", "e120f4dd61c339763bb33b53105c9e182d679ea4", LinuxX64,
+                "817944f0f5e8bc253095b3de1a83afa3eae1b92e7051a1e673f102be5ab2c2e2");
+            yield return new TestCaseData("0.4.2", "e120f4dd61c339763bb33b53105c9e182d679ea4", LinuxArm,
+                "cafc29934635b196031a3314eb421e68f3b85b45e60532ecf18adfd403454956");
+            yield return new TestCaseData("0.4.2", "e120f4dd61c339763bb33b53105c9e182d679ea4", MacArm,
+                "5a39f2aeff14694d706b2f895079d588990d70d3cdafe591d6251ca9389d2be4");
+        }
+
+        [SetUp]
+        public void RegisterSyntheticReleases()
+        {
+            foreach (var release in CompatibleReleases())
+                AuthenticationHostRelease.CompatibleReleases[(string)release.Arguments[3]] = (string)release.Arguments[1];
+        }
+
+        [TearDown]
+        public void ForgetSyntheticReleases()
+        {
+            foreach (var release in CompatibleReleases())
+                AuthenticationHostRelease.CompatibleReleases.Remove((string)release.Arguments[3]);
+        }
+
+        [TestCaseSource(nameof(FormerCompatibleReleases))]
+        public void EarlierReleasesMustBeUpdatedBeforeServingRequests(string version, string source, string target, string hash)
+        {
+            var manifest = Manifest(version, PreviousUpstream, source, target, hash);
+            Assert.That(AuthenticationHostRelease.IsCompatibleRelease(new JavaScriptSerializer().Serialize(manifest), hash), Is.False);
+            var fake = new FakeTarget(manifest, target);
+
+            Assert.That(Assert.ThrowsAsync<AuthenticationCenterException>(() => fake.Request("ssh")).Code,
+                Is.EqualTo("backend_update_available"));
+            Assert.That(fake.Operations, Is.EqualTo(new[] { "mycodex-auth-package" }));
         }
 
         [TestCaseSource(nameof(CompatibleReleases))]
         public async Task CompatibleOfficialReleaseServesSshTargetsAndOffersAnUpdate(string version, string source, string target, string hash)
         {
-            var fake = new FakeTarget(Manifest(version, Upstream, source, target, hash), target);
+            var fake = new FakeTarget(Manifest(version, PreviousUpstream, source, target, hash), target);
             var host = fake.Ssh();
 
             var status = await host.RequestAsync("status", new Dictionary<string, object>(), CancellationToken.None);
@@ -69,7 +112,7 @@ namespace MyCodex.Application.Tests
         {
             if (target == MacArm) Assert.Pass("WSL runs Linux builds only.");
             // The fake stops at directory preparation, before a real wsl.exe would be started.
-            var fake = new FakeTarget(Manifest(version, Upstream, source, target, hash), target) { PrepareExitCode = 1 };
+            var fake = new FakeTarget(Manifest(version, PreviousUpstream, source, target, hash), target) { PrepareExitCode = 1 };
 
             var error = Assert.ThrowsAsync<AuthenticationCenterException>(() =>
                 fake.Wsl().RequestAsync("status", new Dictionary<string, object>(), CancellationToken.None));
@@ -82,7 +125,7 @@ namespace MyCodex.Application.Tests
         public void CompatibleReleaseCanStillBeUpdated(string transport)
         {
             var release = CompatibleReleases().First().Arguments;
-            var fake = new FakeTarget(Manifest((string)release[0], Upstream, (string)release[1], (string)release[2], (string)release[3]), (string)release[2]);
+            var fake = new FakeTarget(Manifest((string)release[0], PreviousUpstream, (string)release[1], (string)release[2], (string)release[3]), (string)release[2]);
 
             var error = Assert.ThrowsAsync<AuthenticationCenterException>(() => fake.Update(transport));
             // The fake probe fails, so reaching it proves the update was not skipped as already current.
@@ -102,7 +145,7 @@ namespace MyCodex.Application.Tests
         {
             var release = CompatibleReleases().First().Arguments;
             var manifest = Manifest(altered == "older" ? "0.3.10" : (string)release[0],
-                altered == "older" ? EarlierUpstream : Upstream,
+                altered == "older" ? EarlierUpstream : PreviousUpstream,
                 altered == "source" ? new string('e', 40) : (string)release[1], LinuxX64,
                 altered == "hash" || altered == "older" ? new string('f', 64) : (string)release[3]);
             if (altered == "dirty") manifest["sourceDirty"] = true;
@@ -113,9 +156,9 @@ namespace MyCodex.Application.Tests
             Assert.That(fake.Operations, Is.EqualTo(new[] { "mycodex-auth-package" }));
         }
 
-        [TestCase("wsl", "0.4.3", 3, Upstream)]
+        [TestCase("wsl", "0.5.1", 3, CurrentUpstream)]
         [TestCase("wsl", "0.10.0", 4, "cccccccccccccccccccccccccccccccccccccccc")]
-        [TestCase("ssh", "0.4.3", 3, Upstream)]
+        [TestCase("ssh", "0.5.1", 3, CurrentUpstream)]
         [TestCase("ssh", "0.10.0", 4, "cccccccccccccccccccccccccccccccccccccccc")]
         public void NewerBackendIsNeitherRunNorDowngraded(string transport, string version, int protocol, string upstream)
         {
@@ -137,7 +180,7 @@ namespace MyCodex.Application.Tests
         [TestCase("ssh")]
         public void UnreadableVersionCannotBeReplaced(string transport)
         {
-            var fake = new FakeTarget(Manifest("0.5.0-beta", Upstream, new string('e', 40), LinuxX64, new string('f', 64)), LinuxX64);
+            var fake = new FakeTarget(Manifest("0.5.0-beta", PreviousUpstream, new string('e', 40), LinuxX64, new string('f', 64)), LinuxX64);
 
             Assert.That(Assert.ThrowsAsync<AuthenticationCenterException>(() => fake.Update(transport)).Code,
                 Is.EqualTo("backend_incompatible"));
@@ -150,7 +193,7 @@ namespace MyCodex.Application.Tests
         [TestCase("ssh", true)]
         public async Task UnusableBackendBlocksConnectionOnlyForAnUnfinishedMigration(string transport, bool pending)
         {
-            var fake = new FakeTarget(Manifest("0.4.3", Upstream, new string('e', 40), LinuxX64, new string('f', 64)), LinuxX64)
+            var fake = new FakeTarget(Manifest("0.5.1", CurrentUpstream, new string('e', 40), LinuxX64, new string('f', 64)), LinuxX64)
             {
                 JournalExitCode = pending ? 20 : 0
             };
@@ -184,7 +227,7 @@ namespace MyCodex.Application.Tests
             foreach (var archive in new[] { AuthenticationHostRelease.ForTarget("Linux", "x86_64"),
                 AuthenticationHostRelease.ForTarget("Linux", "aarch64"), AuthenticationHostRelease.ForTarget("Darwin", "arm64") })
             {
-                var text = new JavaScriptSerializer().Serialize(Manifest("0.4.2", Upstream,
+                var text = new JavaScriptSerializer().Serialize(Manifest("0.5.0", CurrentUpstream,
                     AuthenticationHostRelease.SourceRevision, archive.Target, archive.ExecutableSha256));
                 Assert.That(AuthenticationHostRelease.IsCompatibleRelease(text, archive.ExecutableSha256), Is.False);
             }

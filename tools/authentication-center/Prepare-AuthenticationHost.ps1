@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$hostVersion = '0.4.2'
+$hostVersion = '0.5.0'
 if ([string]::IsNullOrWhiteSpace($DestinationRoot)) { $DestinationRoot = Join-Path $repositoryRoot 'runtime\auth-core' }
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
     $existingManifest = Join-Path $DestinationRoot 'mycodex-auth-host.manifest.json'
@@ -58,7 +58,7 @@ if ($LASTEXITCODE -ne 0 -or ((-not [string]::IsNullOrWhiteSpace(($currentChanges
     throw 'The source cleanliness changed during the build. Run preparation again.'
 }
 if ($identity.hostVersion -ne $hostVersion -or $identity.protocolVersion -ne 3 -or
-    $identity.upstreamRevision -ne '85ad4969b3399500baaea9d46b1e08f87aba80e1' -or
+    $identity.upstreamRevision -ne '768eec9ca94db629f086e8c01ca91e2f63bb273d' -or
     $identity.sourceRevision -ne $revision -or $identity.sourceDirty -isnot [bool] -or $identity.sourceDirty -ne $dirty -or
     $identity.target -ne 'x86_64-pc-windows-msvc') {
     throw 'The built backend identity does not match the selected source or supported Windows target.'
