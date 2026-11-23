@@ -7261,6 +7261,9 @@ This cannot be undone.</value>
 <data name="GitCloneForm.Status.LoadingRepositories" xml:space="preserve">
     <value>Loading GitHub repositories...</value>
   </data>
+<data name="GitCloneForm.Status.RepositoriesFiltered.Template" xml:space="preserve">
+    <value>Showing {0} of {1} loaded repositories.</value>
+  </data>
 <data name="GitCloneForm.Status.RepositoriesLoaded.Template" xml:space="preserve">
     <value>Loaded {0} GitHub repositories.</value>
   </data>
@@ -7281,12 +7284,6 @@ This cannot be undone.</value>
   </data>
 <data name="GitCloneForm.Value.NotAvailable" xml:space="preserve">
     <value>Not available</value>
-  </data>
-<data name="GitCloneForm.Value.Private" xml:space="preserve">
-    <value>Private</value>
-  </data>
-<data name="GitCloneForm.Value.Public" xml:space="preserve">
-    <value>Public</value>
   </data>
 <data name="GitCloneForm.Output.Starting.Template" xml:space="preserve">
     <value>Starting clone: {0}</value>
@@ -8052,12 +8049,6 @@ This will initialize Git first if needed. This step only binds the remote; it wi
   </data>
 <data name="GitRemoteRepositoriesForm.Value.NotAvailable" xml:space="preserve">
     <value>Not available</value>
-  </data>
-<data name="GitRemoteRepositoriesForm.Value.Private" xml:space="preserve">
-    <value>Private</value>
-  </data>
-<data name="GitRemoteRepositoriesForm.Value.Public" xml:space="preserve">
-    <value>Public</value>
   </data>
 <data name="GitRemoteRepositoriesForm.Value.RepositoryWithVisibility.Template" xml:space="preserve">
     <value>{0} ({1})</value>
@@ -14515,5 +14506,20 @@ Trust this host key and retry detection?</value></data>
   </data>
   <data name="HooksManagementForm.Status.Ignored" xml:space="preserve">
     <value>The runtime did not accept this change. Built-in hooks cannot be changed.</value>
+  </data>
+<data name="GitHubRepositoryList.Value.Private" xml:space="preserve">
+    <value>Private</value>
+  </data>
+<data name="GitHubRepositoryList.Value.Public" xml:space="preserve">
+    <value>Public</value>
+  </data>
+<data name="GitHubRepositoryList.Value.Internal" xml:space="preserve">
+    <value>Internal</value>
+  </data>
+<data name="GitHubRepositoryList.Status.Truncated.Template" xml:space="preserve">
+    <value>Only the first {0} of {1} repositories were loaded.</value>
+  </data>
+<data name="GitHubRepositoryList.Status.TruncatedUnknown.Template" xml:space="preserve">
+    <value>Only the first {0} repositories were loaded.</value>
   </data>
 </root>

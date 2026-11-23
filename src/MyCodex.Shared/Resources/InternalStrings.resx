@@ -1117,6 +1117,12 @@ This file is empty.</value>
   <data name="GitEnvironmentService.Value.NotDetected" xml:space="preserve">
     <value>Not detected</value>
   </data>
+  <data name="GitHubCli.RepositoryList.SamlRequired" xml:space="preserve">
+    <value>Some organizations require SAML single sign-on, so their repositories are not listed. Authorize GitHub CLI for those organizations on GitHub, then load again.</value>
+  </data>
+  <data name="GitHubCli.RepositoryList.PartiallyRead.Template" xml:space="preserve">
+    <value>Some repositories could not be read: {0}</value>
+  </data>
   <data name="GitHubCli.Status.NotInstalled" xml:space="preserve">
     <value>GitHub CLI is not installed.</value>
   </data>

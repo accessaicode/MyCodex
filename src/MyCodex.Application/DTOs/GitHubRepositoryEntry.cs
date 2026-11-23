@@ -40,6 +40,9 @@ namespace MyCodex.Application.DTOs
 
         public bool IsFork { get; set; }
 
+        // Set by repository listing: the signed-in account owns it, so its short name is unambiguous.
+        public bool IsOwnedByViewer { get; set; }
+
         public string Topics { get; set; }
 
         public string HttpsUrl { get; set; }

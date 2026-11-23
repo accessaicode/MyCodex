@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -47,8 +48,10 @@ namespace MyCodex.WinForms.Forms
         private readonly Button _openGitWorkbenchButton;
         private readonly Button _closeButton;
         private CancellationTokenSource _cloneCancellation;
+        private const int RepositoryListLimit = 1000;
         private CancellationTokenSource _repositoriesCancellation;
         private IReadOnlyList<GitHubRepositoryEntry> _githubRepositories = new List<GitHubRepositoryEntry>();
+        private IReadOnlyList<GitHubRepositoryEntry> _displayedGitHubRepositories = new List<GitHubRepositoryEntry>();
         private string _lastClonedPath;
         private bool _targetFolderEditedByUser;
         private bool _isUpdatingTargetFolder;
@@ -149,6 +152,7 @@ namespace MyCodex.WinForms.Forms
             _repositoryUrlTextBox.TextChanged += RepositoryUrlTextBox_TextChanged;
             _targetFolderTextBox.TextChanged += TargetFolderTextBox_TextChanged;
             _githubRepositoriesListView.DoubleClick += (sender, e) => ApplySelectedGitHubRepository();
+            _githubFilterTextBox.TextChanged += (sender, e) => ShowFilteredGitHubRepositories();
             _githubRepositoriesListView.KeyDown += GitHubRepositoriesListView_KeyDown;
             _useSshCloneUrlCheckBox.CheckedChanged += (sender, e) => ApplySelectedGitHubRepository();
             _refreshRepositoriesButton.Click += async (sender, e) => await RefreshGitHubRepositoriesAsync();
@@ -337,14 +341,24 @@ namespace MyCodex.WinForms.Forms
             var shouldFocusRepositories = false;
             try
             {
-                _githubRepositories = await _gitHubCliService.ListRepositoriesAsync(
-                    _githubFilterTextBox.Text,
-                    100,
+                // Load everything once; the filter box then narrows the loaded list as the user types.
+                var result = await _gitHubCliService.ListRepositoriesAsync(
+                    null,
+                    RepositoryListLimit,
                     _repositoriesCancellation.Token);
-                PopulateGitHubRepositories(_githubRepositories);
-                SetStatus(string.Format(
+                _githubRepositories = result.Repositories ?? new List<GitHubRepositoryEntry>();
+                PopulateGitHubRepositories();
+                foreach (var warning in result.Warnings ?? new string[0])
+                {
+                    AppendOutput(warning);
+                    _copyOutputButton.Enabled = true;
+                }
+
+                var status = string.Format(
                     UiLocalization.Text("GitCloneForm.Status.RepositoriesLoaded.Template", "Loaded {0} GitHub repositories."),
-                    _githubRepositories.Count), false);
+                    _githubRepositories.Count);
+                var notes = GitHubRepositoryListText.LoadNotes(_githubRepositories.Count, result.TotalCount, result.IsTruncated, result.Warnings);
+                SetStatus(string.IsNullOrEmpty(notes) ? status : status + " " + notes, false);
                 shouldFocusRepositories = true;
             }
             catch (OperationCanceledException)
@@ -354,7 +368,7 @@ namespace MyCodex.WinForms.Forms
             catch (Exception ex)
             {
                 _githubRepositories = new List<GitHubRepositoryEntry>();
-                _githubRepositoriesListView.Items.Clear();
+                PopulateGitHubRepositories();
                 AppendOutput(ex.Message);
                 _copyOutputButton.Enabled = true;
                 SetStatus(UiLocalization.Text("GitCloneForm.Status.RepositoriesFailed", "Failed to load GitHub repositories. Check GitHub CLI login in remote accounts."), true);
@@ -375,16 +389,32 @@ namespace MyCodex.WinForms.Forms
             }
         }
 
-        private void PopulateGitHubRepositories(IReadOnlyList<GitHubRepositoryEntry> repositories)
+        private void ShowFilteredGitHubRepositories()
         {
+            if (_githubRepositories.Count == 0)
+            {
+                return;
+            }
+
+            PopulateGitHubRepositories();
+            SetStatus(string.Format(
+                UiLocalization.Text("GitCloneForm.Status.RepositoriesFiltered.Template", "Showing {0} of {1} loaded repositories."),
+                _displayedGitHubRepositories.Count,
+                _githubRepositories.Count), false);
+        }
+
+        private void PopulateGitHubRepositories()
+        {
+            var filter = _githubFilterTextBox.Text.Trim();
+            _displayedGitHubRepositories = filter.Length == 0
+                ? _githubRepositories
+                : _githubRepositories.Where(repository => repository != null &&
+                    (ContainsText(repository.NameWithOwner, filter) || ContainsText(repository.Description, filter))).ToList();
             _githubRepositoriesListView.BeginUpdate();
             _githubRepositoriesListView.Items.Clear();
-            if (repositories != null)
+            foreach (var repository in _displayedGitHubRepositories)
             {
-                foreach (var repository in repositories)
-                {
-                    _githubRepositoriesListView.Items.Add(CreateGitHubRepositoryItem(repository));
-                }
+                _githubRepositoriesListView.Items.Add(CreateGitHubRepositoryItem(repository));
             }
 
             _githubRepositoriesListView.EndUpdate();
@@ -446,7 +476,7 @@ namespace MyCodex.WinForms.Forms
             RepositoryUrlTextBox_TextChanged(_repositoryUrlTextBox, EventArgs.Empty);
             SetStatus(string.Format(
                 UiLocalization.Text("GitCloneForm.Status.RepositorySelected.Template", "Selected repository: {0}"),
-                GetRepositoryDisplayName(repository)), true);
+                GitHubRepositoryNames.GetDisplayName(repository)), true);
             _cloneButton.Focus();
         }
 
@@ -455,8 +485,8 @@ namespace MyCodex.WinForms.Forms
             var index = _githubRepositoriesListView.SelectedIndices.Count > 0
                 ? _githubRepositoriesListView.SelectedIndices[0]
                 : -1;
-            return _githubRepositories != null && index >= 0 && index < _githubRepositories.Count
-                ? _githubRepositories[index]
+            return index >= 0 && index < _displayedGitHubRepositories.Count
+                ? _displayedGitHubRepositories[index]
                 : null;
         }
 
@@ -490,7 +520,7 @@ namespace MyCodex.WinForms.Forms
             if (IsGitHubSourceSelected() && string.IsNullOrWhiteSpace(_targetFolderTextBox.Text))
             {
                 _isUpdatingTargetFolder = true;
-                _targetFolderTextBox.Text = GetRepositoryDisplayName(githubRepository);
+                _targetFolderTextBox.Text = GitHubRepositoryNames.GetShortName(githubRepository);
                 _isUpdatingTargetFolder = false;
             }
 
@@ -500,7 +530,7 @@ namespace MyCodex.WinForms.Forms
             AppendOutput(string.Format(
                 UiLocalization.Text("GitCloneForm.Output.Starting.Template", "Starting clone: {0}"),
                 IsGitHubSourceSelected()
-                    ? GetRepositoryDisplayName(githubRepository)
+                    ? GitHubRepositoryNames.GetDisplayName(githubRepository)
                     : GitOutputSanitizer.RedactSensitiveText(_repositoryUrlTextBox.Text)));
             SetStatus(UiLocalization.Text("GitCloneForm.Status.Cloning", "Cloning repository..."), true);
             _cloneCancellation = new CancellationTokenSource();
@@ -664,66 +694,30 @@ namespace MyCodex.WinForms.Forms
 
         private static ListViewItem CreateGitHubRepositoryItem(GitHubRepositoryEntry repository)
         {
-            var item = new ListViewItem(GetRepositoryDisplayName(repository));
-            item.SubItems.Add(DisplayRepositoryVisibility(repository));
-            item.SubItems.Add(string.IsNullOrWhiteSpace(repository != null ? repository.DefaultBranch : null)
+            var name = GitHubRepositoryNames.GetDisplayName(repository);
+            var visibility = GitHubRepositoryListText.Visibility(repository);
+            var defaultBranch = string.IsNullOrWhiteSpace(repository != null ? repository.DefaultBranch : null)
                 ? UiLocalization.Text("GitCloneForm.Value.NotAvailable", "Not available")
-                : repository.DefaultBranch);
-            item.SubItems.Add(repository != null && repository.UpdatedAt.HasValue
+                : repository.DefaultBranch;
+            var updated = repository != null && repository.UpdatedAt.HasValue
                 ? repository.UpdatedAt.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                : UiLocalization.Text("GitCloneForm.Value.NotAvailable", "Not available"));
+                : UiLocalization.Text("GitCloneForm.Value.NotAvailable", "Not available");
+            var item = new ListViewItem(name);
+            item.SubItems.Add(visibility);
+            item.SubItems.Add(defaultBranch);
+            item.SubItems.Add(updated);
             item.ToolTipText = string.Format(
                 UiLocalization.Text("GitCloneForm.GitHubRepository.Template", "{0}; {1}; default: {2}; updated: {3}"),
-                GetRepositoryDisplayName(repository),
-                DisplayRepositoryVisibility(repository),
-                string.IsNullOrWhiteSpace(repository != null ? repository.DefaultBranch : null)
-                    ? UiLocalization.Text("GitCloneForm.Value.NotAvailable", "Not available")
-                    : repository.DefaultBranch,
-                repository != null && repository.UpdatedAt.HasValue
-                    ? repository.UpdatedAt.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
-                    : UiLocalization.Text("GitCloneForm.Value.NotAvailable", "Not available"));
+                name,
+                visibility,
+                defaultBranch,
+                updated);
             return item;
         }
 
-        private static string DisplayRepositoryVisibility(GitHubRepositoryEntry repository)
+        private static bool ContainsText(string value, string filter)
         {
-            if (repository == null)
-            {
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(repository.Visibility))
-            {
-                if (string.Equals(repository.Visibility, "PRIVATE", StringComparison.OrdinalIgnoreCase))
-                {
-                    return UiLocalization.Text("GitCloneForm.Value.Private", "Private");
-                }
-
-                if (string.Equals(repository.Visibility, "PUBLIC", StringComparison.OrdinalIgnoreCase))
-                {
-                    return UiLocalization.Text("GitCloneForm.Value.Public", "Public");
-                }
-
-                return repository.Visibility;
-            }
-
-            return repository.IsPrivate
-                ? UiLocalization.Text("GitCloneForm.Value.Private", "Private")
-                : UiLocalization.Text("GitCloneForm.Value.Public", "Public");
-        }
-
-        private static string GetRepositoryDisplayName(GitHubRepositoryEntry repository)
-        {
-            if (repository == null || string.IsNullOrWhiteSpace(repository.NameWithOwner))
-            {
-                return string.Empty;
-            }
-
-            var value = repository.NameWithOwner.Trim();
-            var slashIndex = value.LastIndexOf('/');
-            return slashIndex >= 0 && slashIndex < value.Length - 1
-                ? value.Substring(slashIndex + 1)
-                : value;
+            return !string.IsNullOrEmpty(value) && value.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private async Task BrowseButton_ClickAsync()

@@ -353,7 +353,7 @@ namespace MyCodex.Application.Tests
             }
 
             public Task<GitHubCliAccountSnapshot> ReadAccountAsync(CancellationToken cancellationToken) { throw new NotImplementedException(); }
-            public Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken) { throw new NotImplementedException(); }
+            public Task<GitHubRepositoryListResult> ListRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken) { throw new NotImplementedException(); }
             public Task<GitHubRepositorySearchResult> SearchRepositoriesAsync(GitHubRepositorySearchRequest request, CancellationToken cancellationToken) { throw new NotImplementedException(); }
             public Task<GitHubRepositoryEntry> ForkRepositoryAsync(GitHubRepositoryEntry repository, CancellationToken cancellationToken) { throw new NotImplementedException(); }
             public Task<IReadOnlyList<GitHubRepositoryEntry>> ListEmptyRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken) { throw new NotImplementedException(); }

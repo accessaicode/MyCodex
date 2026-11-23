@@ -198,12 +198,16 @@ namespace MyCodex.Application.Tests
                     (Capabilities & capability) == capability;
             }
 
-            public Task<IReadOnlyList<RemoteRepositoryEntry>> ListRepositoriesAsync(
+            public Task<RemoteRepositoryListResult> ListRepositoriesAsync(
                 string keyword,
                 int limit,
                 CancellationToken cancellationToken)
             {
-                return Task.FromResult<IReadOnlyList<RemoteRepositoryEntry>>(new RemoteRepositoryEntry[0]);
+                return Task.FromResult(new RemoteRepositoryListResult
+                {
+                    Repositories = new RemoteRepositoryEntry[0],
+                    Warnings = new string[0]
+                });
             }
 
             public TCapability GetCapability<TCapability>() where TCapability : class

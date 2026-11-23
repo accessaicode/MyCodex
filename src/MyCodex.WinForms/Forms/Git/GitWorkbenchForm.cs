@@ -1003,7 +1003,7 @@ namespace MyCodex.WinForms.Forms
             {
                 RefreshActionButtons();
                 SetOperationLog(UiLocalization.Text("GitWorkbenchForm.Status.LoadingEmptyGitHubRepositories", "Loading empty GitHub repositories..."));
-                var repositories = await _gitHubCliService.ListEmptyRepositoriesAsync(null, 100, System.Threading.CancellationToken.None).ConfigureAwait(true);
+                var repositories = await _gitHubCliService.ListEmptyRepositoriesAsync(null, 1000, System.Threading.CancellationToken.None).ConfigureAwait(true);
                 SetOperationLog(string.Format(
                     UiLocalization.Text("GitWorkbenchForm.Status.EmptyGitHubRepositoriesLoaded.Template", "Loaded {0} empty GitHub repositories."),
                     repositories == null ? 0 : repositories.Count));

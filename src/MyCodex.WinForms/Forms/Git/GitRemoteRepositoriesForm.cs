@@ -96,6 +96,7 @@ namespace MyCodex.WinForms.Forms
         private ProviderRepositoryState _activeProviderState;
         private bool _isSwitchingProviderState;
         private readonly IGitHostingProviderService _gitHostingProviderService;
+        private const int RepositoryListLimit = 1000;
         private readonly TextBox _githubFilterTextBox;
         private readonly Button _refreshButton;
         private readonly Button _createRepositoryButton;
@@ -474,21 +475,24 @@ namespace MyCodex.WinForms.Forms
             SetStatus(UiLocalization.Text("GitRemoteRepositoriesForm.Status.Loading", "Loading GitHub repositories..."), speakLoadedStatus);
             try
             {
-                var repositories = await provider.ListRepositoriesAsync(
-                        state.FilterKeyword,
-                        200,
+                // Load everything the account can reach; the filter controls narrow the loaded list locally.
+                var result = await provider.ListRepositoriesAsync(
+                        null,
+                        RepositoryListLimit,
                         state.RefreshCancellation.Token)
                     .ConfigureAwait(true);
-                state.Repositories = (repositories ?? new RemoteRepositoryEntry[0])
+                state.Repositories = (result.Repositories ?? new RemoteRepositoryEntry[0])
                     .Select(RemoteRepositoryEntryMapper.ToGitHubRepository)
                     .Where(repository => repository != null)
                     .ToList();
                 state.HasLoaded = true;
                 var displayed = ApplyFilterAndSortRepositories(state);
                 PopulateRepositories(state, displayed);
-                SetStatus(string.Format(
+                var status = string.Format(
                     UiLocalization.Text("GitRemoteRepositoriesForm.Status.Loaded.Template", "Loaded {0} GitHub repositories."),
-                    displayed == null ? 0 : displayed.Count),
+                    displayed == null ? 0 : displayed.Count);
+                var notes = GitHubRepositoryListText.LoadNotes(state.Repositories.Count, result.TotalCount, result.IsTruncated, result.Warnings);
+                SetStatus(string.IsNullOrEmpty(notes) ? status : status + " " + notes,
                     speakLoadedStatus && ReferenceEquals(_activeProviderState, state));
                 if (ReferenceEquals(_activeProviderState, state))
                 {
@@ -1496,25 +1500,10 @@ namespace MyCodex.WinForms.Forms
                 return false;
             }
 
-            var isPrivate = IsRepositoryPrivate(repository);
+            var isPrivate = !GitHubRepositoryNames.IsPublic(repository);
             return visibilityFilter == RepositoryVisibilityFilter.Private
                 ? isPrivate
                 : !isPrivate;
-        }
-
-        private static bool IsRepositoryPrivate(GitHubRepositoryEntry repository)
-        {
-            if (repository == null)
-            {
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(repository.Visibility))
-            {
-                return string.Equals(repository.Visibility, "PRIVATE", StringComparison.OrdinalIgnoreCase);
-            }
-
-            return repository.IsPrivate;
         }
 
         private IReadOnlyList<GitHubRepositoryEntry> ApplyRepositorySort(
@@ -1973,51 +1962,10 @@ namespace MyCodex.WinForms.Forms
             return item;
         }
 
-        private static string DisplayRepositoryVisibility(GitHubRepositoryEntry repository)
-        {
-            if (repository == null)
-            {
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(repository.Visibility))
-            {
-                if (string.Equals(repository.Visibility, "PRIVATE", StringComparison.OrdinalIgnoreCase))
-                {
-                    return UiLocalization.Text("GitRemoteRepositoriesForm.Value.Private", "Private");
-                }
-
-                if (string.Equals(repository.Visibility, "PUBLIC", StringComparison.OrdinalIgnoreCase))
-                {
-                    return UiLocalization.Text("GitRemoteRepositoriesForm.Value.Public", "Public");
-                }
-
-                return repository.Visibility;
-            }
-
-            return repository.IsPrivate
-                ? UiLocalization.Text("GitRemoteRepositoriesForm.Value.Private", "Private")
-                : UiLocalization.Text("GitRemoteRepositoriesForm.Value.Public", "Public");
-        }
-
-        private static string GetRepositoryDisplayName(GitHubRepositoryEntry repository)
-        {
-            if (repository == null || string.IsNullOrWhiteSpace(repository.NameWithOwner))
-            {
-                return string.Empty;
-            }
-
-            var value = repository.NameWithOwner.Trim();
-            var slashIndex = value.LastIndexOf('/');
-            return slashIndex >= 0 && slashIndex < value.Length - 1
-                ? value.Substring(slashIndex + 1)
-                : value;
-        }
-
         private static string GetRepositoryDisplayNameWithVisibility(GitHubRepositoryEntry repository)
         {
-            var name = GetRepositoryDisplayName(repository);
-            var visibility = DisplayRepositoryVisibility(repository);
+            var name = GitHubRepositoryNames.GetDisplayName(repository);
+            var visibility = GitHubRepositoryListText.Visibility(repository);
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(visibility))
             {
                 return name;
@@ -2106,7 +2054,7 @@ namespace MyCodex.WinForms.Forms
 
             public RepositoryRenameForm(GitHubRepositoryEntry repository)
             {
-                NewRepositoryName = GetRepositoryDisplayName(repository);
+                NewRepositoryName = GitHubRepositoryNames.GetShortName(repository);
                 Text = UiLocalization.Text("GitRemoteRepositoriesForm.RenameForm.Title", "Rename Repository");
                 StartPosition = FormStartPosition.CenterParent;
                 FormBorderStyle = FormBorderStyle.FixedDialog;

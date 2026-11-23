@@ -41,13 +41,17 @@ namespace MyCodex.Application.Tests
             };
             var provider = new GitHubHostingProvider(new FakeGitHubCliService(new[] { source }));
 
-            var repositories = await provider.ListRepositoriesAsync("repo", 20, CancellationToken.None);
+            var result = await provider.ListRepositoriesAsync("repo", 20, CancellationToken.None);
+            var repositories = result.Repositories;
 
             Assert.That(repositories, Has.Count.EqualTo(1));
             Assert.That(repositories[0].ProviderId, Is.EqualTo(GitHubHostingProvider.ProviderId));
             Assert.That(repositories[0].ProviderDisplayName, Is.EqualTo("GitHub"));
             Assert.That(repositories[0].NameWithOwner, Is.EqualTo(source.NameWithOwner));
             Assert.That(repositories[0].ProviderData, Is.SameAs(source));
+            Assert.That(result.TotalCount, Is.EqualTo(3));
+            Assert.That(result.IsTruncated, Is.True);
+            Assert.That(result.Warnings, Is.EqualTo(new[] { "warning" }));
         }
 
         [Test]
@@ -85,19 +89,23 @@ namespace MyCodex.Application.Tests
                        (Capabilities & capability) == capability;
             }
 
-            public Task<IReadOnlyList<RemoteRepositoryEntry>> ListRepositoriesAsync(
+            public Task<RemoteRepositoryListResult> ListRepositoriesAsync(
                 string keyword,
                 int limit,
                 CancellationToken cancellationToken)
             {
-                return Task.FromResult<IReadOnlyList<RemoteRepositoryEntry>>(new[]
+                return Task.FromResult(new RemoteRepositoryListResult
                 {
-                    new RemoteRepositoryEntry
+                    Repositories = new[]
                     {
-                        ProviderId = Id,
-                        ProviderDisplayName = DisplayName,
-                        NameWithOwner = "custom/repo"
-                    }
+                        new RemoteRepositoryEntry
+                        {
+                            ProviderId = Id,
+                            ProviderDisplayName = DisplayName,
+                            NameWithOwner = "custom/repo"
+                        }
+                    },
+                    Warnings = new string[0]
                 });
             }
 
@@ -121,9 +129,15 @@ namespace MyCodex.Application.Tests
                 throw new NotImplementedException();
             }
 
-            public Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken)
+            public Task<GitHubRepositoryListResult> ListRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken)
             {
-                return Task.FromResult(_repositories);
+                return Task.FromResult(new GitHubRepositoryListResult
+                {
+                    Repositories = _repositories,
+                    TotalCount = 3,
+                    IsTruncated = true,
+                    Warnings = new[] { "warning" }
+                });
             }
 
             public Task<IReadOnlyList<GitHubRepositoryEntry>> ListEmptyRepositoriesAsync(string keyword, int limit, CancellationToken cancellationToken)

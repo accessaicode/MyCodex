@@ -68,17 +68,23 @@ namespace MyCodex.Infrastructure.GitHosting
                    (Capabilities & capability) == capability;
         }
 
-        public async Task<IReadOnlyList<RemoteRepositoryEntry>> ListRepositoriesAsync(
+        public async Task<RemoteRepositoryListResult> ListRepositoriesAsync(
             string keyword,
             int limit,
             CancellationToken cancellationToken)
         {
-            var repositories = await _gitHubCliService.ListRepositoriesAsync(keyword, limit, cancellationToken)
+            var result = await _gitHubCliService.ListRepositoriesAsync(keyword, limit, cancellationToken)
                 .ConfigureAwait(false);
-            return (repositories ?? new GitHubRepositoryEntry[0])
-                .Where(repository => repository != null)
-                .Select(repository => RemoteRepositoryEntryMapper.FromGitHub(repository, Id, DisplayName))
-                .ToList();
+            return new RemoteRepositoryListResult
+            {
+                Repositories = (result == null || result.Repositories == null ? new GitHubRepositoryEntry[0] : result.Repositories)
+                    .Where(repository => repository != null)
+                    .Select(repository => RemoteRepositoryEntryMapper.FromGitHub(repository, Id, DisplayName))
+                    .ToList(),
+                TotalCount = result == null ? null : result.TotalCount,
+                IsTruncated = result != null && result.IsTruncated,
+                Warnings = result == null || result.Warnings == null ? new string[0] : result.Warnings
+            };
         }
 
         public TCapability GetCapability<TCapability>() where TCapability : class

@@ -36,7 +36,7 @@ namespace MyCodex.Application.Interfaces
 
         bool Supports(GitHostingProviderCapabilities capability);
 
-        Task<IReadOnlyList<RemoteRepositoryEntry>> ListRepositoriesAsync(
+        Task<RemoteRepositoryListResult> ListRepositoriesAsync(
             string keyword,
             int limit,
             CancellationToken cancellationToken);

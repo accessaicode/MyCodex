@@ -94,71 +94,13 @@ namespace MyCodex.Infrastructure.GitHosting
             _commandRunner.StartInteractiveLogin();
         }
 
-        public Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
+        public Task<GitHubRepositoryListResult> ListRepositoriesAsync(
             string keyword,
             int limit,
             CancellationToken cancellationToken)
         {
-            return ListRepositoriesAsync("OWNER,COLLABORATOR,ORGANIZATION_MEMBER", keyword, limit, cancellationToken);
-        }
-
-        private async Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
-            string affiliations,
-            string keyword,
-            int limit,
-            CancellationToken cancellationToken)
-        {
-            var normalizedLimit = NormalizeLimit(limit, 100, 200);
-            var filter = TextValueHelper.TrimToNull(keyword);
-            var repositories = new List<GitHubRepositoryEntry>();
-            string after = null;
-            do
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var pageSize = filter == null ? Math.Min(100, normalizedLimit - repositories.Count) : 100;
-                var page = await ReadRepositoryPageAsync(affiliations, pageSize, after, cancellationToken).ConfigureAwait(false);
-                var matches = JsonValueReader.GetArray(page, "nodes")
-                    .OfType<Dictionary<string, object>>()
-                    .Select(ParseRepository)
-                    .Where(repo => filter == null || Contains(repo.NameWithOwner, filter) || Contains(repo.Description, filter));
-                repositories.AddRange(matches.Take(normalizedLimit - repositories.Count));
-                var pageInfo = JsonValueReader.GetDictionary(page, "pageInfo");
-                after = JsonValueReader.GetBool(pageInfo, "hasNextPage") ? JsonValueReader.GetString(pageInfo, "endCursor") : null;
-            }
-            while (!string.IsNullOrEmpty(after) && repositories.Count < normalizedLimit);
-
-            return repositories;
-        }
-
-        private async Task<Dictionary<string, object>> ReadRepositoryPageAsync(
-            string affiliations, int pageSize, string after, CancellationToken cancellationToken)
-        {
-            var query = "query($size:Int!,$after:String){viewer{repositories(first:$size,after:$after," +
-                "ownerAffiliations:[" + affiliations + "],orderBy:{field:PUSHED_AT,direction:DESC}){" +
-                "pageInfo{hasNextPage endCursor} nodes{nameWithOwner description visibility isPrivate defaultBranchRef{name} " +
-                "updatedAt createdAt pushedAt url sshUrl diskUsage primaryLanguage{name} stargazerCount forkCount " +
-                "watchers{totalCount} homepageUrl licenseInfo{spdxId name} isArchived isFork}}}}";
-            var arguments = new List<string> { "api", "graphql", "-f", "query=" + query, "-F", "size=" + pageSize, "--jq", ".data.viewer.repositories" };
-            if (after != null)
-            {
-                arguments.Add("-f");
-                arguments.Add("after=" + after);
-            }
-
-            var result = await RunGhAsync(GitCommandLineBuilder.BuildArguments(arguments), cancellationToken).ConfigureAwait(false);
-            if (result.ExitCode == GitHubCliCommandResult.NotFoundExitCode)
-            {
-                throw new InvalidOperationException(SharedLocalization.Text("GitHubCli.Status.NotInstalled", "GitHub CLI is not installed."));
-            }
-
-            if (!result.Success)
-            {
-                throw new InvalidOperationException(Redact(string.IsNullOrWhiteSpace(result.StandardError)
-                    ? SharedLocalization.Text("GitHubCli.Status.NotAuthenticated", "GitHub CLI is not logged in to GitHub.")
-                    : result.StandardError.Trim()));
-            }
-
-            return Deserialize(result.StandardOutput);
+            return new GitHubRepositoryListReader(RunGhAsync)
+                .ReadAsync("OWNER,COLLABORATOR,ORGANIZATION_MEMBER", keyword, limit, cancellationToken);
         }
 
         public async Task<GitHubRepositorySearchResult> SearchRepositoriesAsync(
@@ -184,8 +126,9 @@ namespace MyCodex.Infrastructure.GitHosting
             int limit,
             CancellationToken cancellationToken)
         {
-            var repositories = await ListRepositoriesAsync("OWNER", keyword, limit, cancellationToken).ConfigureAwait(false);
-            return repositories
+            var result = await new GitHubRepositoryListReader(RunGhAsync)
+                .ReadAsync("OWNER", keyword, limit, cancellationToken).ConfigureAwait(false);
+            return result.Repositories
                 .Where(IsEmptyRepository)
                 .ToArray();
         }
@@ -1103,32 +1046,6 @@ namespace MyCodex.Infrastructure.GitHosting
             return string.Join(",", topics.Select(GetObjectText).Where(v => !string.IsNullOrWhiteSpace(v)));
         }
 
-        private static GitHubRepositoryEntry ParseRepository(Dictionary<string, object> source)
-        {
-            return new GitHubRepositoryEntry
-            {
-                NameWithOwner = JsonValueReader.GetString(source, "nameWithOwner"),
-                Description = JsonValueReader.GetString(source, "description"),
-                Visibility = JsonValueReader.GetString(source, "visibility"),
-                IsPrivate = JsonValueReader.GetBool(source, "isPrivate"),
-                DefaultBranch = GetNestedString(source, "defaultBranchRef", "name"),
-                UpdatedAt = ParseDate(JsonValueReader.GetString(source, "updatedAt")),
-                CreatedAt = ParseDate(JsonValueReader.GetString(source, "createdAt")),
-                PushedAt = ParseDate(JsonValueReader.GetString(source, "pushedAt")),
-                DiskUsage = JsonValueReader.GetNullableLong(source, "diskUsage"),
-                Stars = JsonValueReader.GetNullableInt(source, "stargazerCount"),
-                Forks = JsonValueReader.GetNullableInt(source, "forkCount"),
-                Watchers = GetNestedNullableInt(source, "watchers", "totalCount"),
-                HomepageUrl = JsonValueReader.GetString(source, "homepageUrl"),
-                License = GetNestedString(source, "licenseInfo", "spdxId") ?? GetNestedString(source, "licenseInfo", "name"),
-                PrimaryLanguage = GetNestedString(source, "primaryLanguage", "name"),
-                IsArchived = JsonValueReader.GetBool(source, "isArchived"),
-                IsFork = JsonValueReader.GetBool(source, "isFork"),
-                HttpsUrl = JsonValueReader.GetString(source, "url"),
-                SshUrl = JsonValueReader.GetString(source, "sshUrl")
-            };
-        }
-
         private IReadOnlyList<GitHubBranchEntry> ParseBranches(string json)
         {
             var entries = new List<GitHubBranchEntry>();
@@ -1446,7 +1363,7 @@ namespace MyCodex.Infrastructure.GitHosting
             return null;
         }
 
-        private static string GetNestedString(IDictionary<string, object> source, string key, string nestedKey)
+        internal static string GetNestedString(IDictionary<string, object> source, string key, string nestedKey)
         {
             if (source == null || !source.ContainsKey(key))
             {
@@ -1457,7 +1374,7 @@ namespace MyCodex.Infrastructure.GitHosting
             return JsonValueReader.GetString(nested, nestedKey);
         }
 
-        private static int? GetNestedNullableInt(IDictionary<string, object> source, string key, string nestedKey)
+        internal static int? GetNestedNullableInt(IDictionary<string, object> source, string key, string nestedKey)
         {
             if (source == null || !source.ContainsKey(key))
             {
@@ -1632,16 +1549,10 @@ namespace MyCodex.Infrastructure.GitHosting
                    string.IsNullOrWhiteSpace(repository.DefaultBranch);
         }
 
-        private static DateTimeOffset? ParseDate(string value)
+        internal static DateTimeOffset? ParseDate(string value)
         {
             DateTimeOffset date;
             return DateTimeOffset.TryParse(value, out date) ? date : (DateTimeOffset?)null;
-        }
-
-        private static bool Contains(string value, string filter)
-        {
-            return !string.IsNullOrWhiteSpace(value) &&
-                   value.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static string BuildCreateRepositoryArguments(GitHubCreateRepositoryRequest request, string name)

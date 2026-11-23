@@ -10,7 +10,7 @@ namespace MyCodex.Application.Interfaces
     {
         Task<GitHubCliAccountSnapshot> ReadAccountAsync(CancellationToken cancellationToken);
 
-        Task<IReadOnlyList<GitHubRepositoryEntry>> ListRepositoriesAsync(
+        Task<GitHubRepositoryListResult> ListRepositoriesAsync(
             string keyword,
             int limit,
             CancellationToken cancellationToken);

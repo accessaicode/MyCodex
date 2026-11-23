@@ -1117,6 +1117,12 @@
   <data name="GitEnvironmentService.Value.NotDetected" xml:space="preserve">
     <value>未检测到</value>
   </data>
+  <data name="GitHubCli.RepositoryList.SamlRequired" xml:space="preserve">
+    <value>部分组织启用了 SAML 单点登录，其仓库未列出。请在 GitHub 上为 GitHub CLI 授权这些组织后重新加载。</value>
+  </data>
+  <data name="GitHubCli.RepositoryList.PartiallyRead.Template" xml:space="preserve">
+    <value>部分仓库无法读取：{0}</value>
+  </data>
   <data name="GitHubCli.Status.NotInstalled" xml:space="preserve">
     <value>未安装 GitHub CLI。</value>
   </data>
