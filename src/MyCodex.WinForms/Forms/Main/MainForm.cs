@@ -2168,29 +2168,29 @@ namespace MyCodex.WinForms.Forms
                 "Conversation stopped."));
         }
 
-        private async void OnUserCenterMenuItemClick(object sender, EventArgs e)
+        private void OnUserCenterMenuItemClick(object sender, EventArgs e)
         {
-            if (!UserCenterForm.IsChatGptAuthActive(_authenticationState))
+            if (!_userCenterMenuItem.Enabled) return;
+            _userCenterMenuItem.Enabled = false;
+            try
             {
-                ShowProviderUsage();
-                return;
+                using (var form = new UserCenterForm(_appServerClient, CreateProviderUsageForm,
+                    () => EnsureAppServerAvailableForActionAsync(UiLocalization.Text("MainForm.Action.OpenUserCenter", "Open user center")), _screenReaderService))
+                {
+                    form.ShowDialog(this);
+                    if (!IsTargetStopping && !IsTargetExitPreparing && form.AuthenticationState != null)
+                        _authenticationState = form.AuthenticationState;
+                }
             }
-
-            if (!await EnsureAppServerAvailableForActionAsync(UiLocalization.Text("MainForm.Action.OpenUserCenter", "Open user center")))
+            finally
             {
-                return;
+                if (!IsTargetStopping && !IsTargetExitPreparing)
+                {
+                    _userCenterMenuItem.Enabled = true;
+                    RefreshHeader();
+                    RefreshInputState();
+                }
             }
-
-            using (var form = new UserCenterForm(
-                       _appServerClient,
-                       _authenticationState,
-                       _screenReaderService))
-            {
-                form.ShowDialog(this);
-            }
-
-            RefreshHeader();
-            RefreshInputState();
         }
 
         private async void OnGoalSetMenuItemClick(object sender, EventArgs e)

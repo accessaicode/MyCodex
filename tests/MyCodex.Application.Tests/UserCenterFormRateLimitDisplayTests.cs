@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using MyCodex.Application.DTOs;
 using MyCodex.Application.Interfaces;
-using MyCodex.Application.Tests.SourceGuards;
 using MyCodex.Application.Tests.TestSupport;
 using MyCodex.WinForms.Forms;
 using NUnit.Framework;
@@ -19,6 +18,86 @@ namespace MyCodex.Application.Tests
     [TestFixture]
     public sealed class UserCenterFormRateLimitDisplayTests
     {
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void PendingAccountReadShowsLoadingAndPopulatesTheSameWindowAutomatically()
+        {
+            var pending = new TaskCompletionSource<AppServerAuthenticationState>();
+            var client = new RecordingAuthenticationClient { ReadAuthentication = () => pending.Task };
+            using (var form = new UserCenterForm(client, client, null))
+            {
+                form.Show();
+                WaitUntil(() => client.RefreshTokenValues.Count > 0);
+                var handle = form.Handle;
+                var details = FormTestDriver.Field<ListBox>(form, "_detailsListBox");
+                Assert.That(form.Visible, Is.True);
+                System.Windows.Forms.Application.DoEvents();
+                Assert.That(details.AccessibleName, Is.Not.Empty);
+                Assert.That(details.TabIndex, Is.Zero);
+                Assert.That(form.ActiveControl, Is.SameAs(details));
+                Assert.That(FormTestDriver.Field<Label>(form, "_statusLabel").TabStop, Is.False);
+                Assert.That(form.MinimumSize.Width, Is.GreaterThanOrEqualTo(760));
+                Assert.That(form.MinimumSize.Height, Is.GreaterThanOrEqualTo(520));
+                Assert.That(details.Items.Cast<string>(), Does.Contain(MyCodex.WinForms.Localization.UiLocalization.Text(
+                    "UserCenterForm.Status.LoadingAccount", "Loading information…")));
+                Assert.That(FormTestDriver.Field<Button>(form, "_refreshButton").Enabled, Is.False);
+                Assert.That(FormTestDriver.Field<Button>(form, "_closeButton").Enabled, Is.True);
+                pending.SetResult(CreateChatGptState());
+                WaitUntil(() => FormTestDriver.Field<Button>(form, "_refreshButton").Enabled);
+                Assert.That(form.Handle, Is.EqualTo(handle));
+                Assert.That(details.Items.Cast<string>(), Has.Some.Contains("reader@example.test"));
+                Assert.That(client.RefreshTokenValues, Is.EqualTo(new[] { false }));
+                Assert.That(client.ConsumedCreditId, Is.Null);
+                Assert.That(client.ConsumedIdempotencyKey, Is.Null);
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void AccountReadFailureStaysInTheWindowAndRefreshRetriesSuccessfully()
+        {
+            var attempts = 0;
+            var client = new RecordingAuthenticationClient
+            {
+                ReadAuthentication = () => ++attempts == 1
+                    ? Task.FromException<AppServerAuthenticationState>(new InvalidOperationException("Synthetic account read failure"))
+                    : Task.FromResult(CreateChatGptState())
+            };
+            using (var form = new UserCenterForm(client, client, null))
+            {
+                form.Show();
+                var refresh = FormTestDriver.Field<Button>(form, "_refreshButton");
+                WaitUntil(() => attempts == 1 && refresh.Enabled);
+                var handle = form.Handle;
+                var details = FormTestDriver.Field<ListBox>(form, "_detailsListBox");
+                Assert.That(details.Items.Cast<string>(), Does.Contain(MyCodex.WinForms.Localization.UiLocalization.Text(
+                    "UserCenterForm.Status.AccountLoadFailed", "Account information could not be loaded. Refresh to try again.")));
+                refresh.PerformClick();
+                WaitUntil(() => attempts == 2 && refresh.Enabled);
+                Assert.That(form.Handle, Is.EqualTo(handle));
+                Assert.That(details.Items.Cast<string>(), Has.Some.Contains("reader@example.test"));
+                Assert.That(client.RefreshTokenValues, Is.EqualTo(new[] { false, false }));
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void ClosingWhileAccountReadIsPendingIgnoresItsLateCompletion()
+        {
+            var pending = new TaskCompletionSource<AppServerAuthenticationState>();
+            var client = new RecordingAuthenticationClient { ReadAuthentication = () => pending.Task };
+            using (var form = new UserCenterForm(client, client, null))
+            {
+                form.Show();
+                WaitUntil(() => client.RefreshTokenValues.Count == 1);
+                form.Close();
+                pending.SetException(new InvalidOperationException("Synthetic late failure"));
+                System.Windows.Forms.Application.DoEvents();
+                Assert.That(form.IsDisposed, Is.True);
+                Assert.That(form.AuthenticationState, Is.Null);
+            }
+        }
+
         [Test]
         [Apartment(ApartmentState.STA)]
         public void ShowingUserCenterObservesAccountWithoutForcingTokenRefresh()
@@ -148,14 +227,10 @@ namespace MyCodex.Application.Tests
             }
         }
 
-        [Category(SourceGuardCategory.SourceBehavior)]
         [Test]
         [Apartment(ApartmentState.STA)]
         public void UserCenterForm_OffersAccessibleManualQuotaResetControls()
         {
-            var source = RepositorySource.ReadSourceFile("UserCenterForm.cs");
-
-            Assert.That(source, Does.Contain("TokenCountFormatter.Format(value)"));
             using (var form = new UserCenterForm(
                        new RecordingAuthenticationClient(),
                        new RecordingAuthenticationClient(),
@@ -267,6 +342,7 @@ namespace MyCodex.Application.Tests
 
         private sealed class RecordingAuthenticationClient : IAppServerAuthenticationClient, IAppServerConnectionClient
         {
+            public Func<Task<AppServerAuthenticationState>> ReadAuthentication;
             public event EventHandler<AppServerEventArgs> EventReceived
             {
                 add { }
@@ -296,6 +372,7 @@ namespace MyCodex.Application.Tests
             public Task<AppServerAuthenticationState> GetAuthenticationStateAsync(bool refreshToken)
             {
                 RefreshTokenValues.Add(refreshToken);
+                if (ReadAuthentication != null) return ReadAuthentication();
                 return Task.FromResult(refreshToken ? new AppServerAuthenticationState() : CreateChatGptState());
             }
 
@@ -411,19 +488,6 @@ namespace MyCodex.Application.Tests
             AppServerRateLimitsSnapshot snapshot,
             AppServerAccountTokenUsageSnapshot usage)
         {
-            var method = typeof(UserCenterForm).GetMethod(
-                "BuildDetailLines",
-                BindingFlags.Static | BindingFlags.NonPublic,
-                null,
-                new[]
-                {
-                    typeof(AppServerAuthenticationState),
-                    typeof(AppServerRateLimitsSnapshot),
-                    typeof(AppServerAccountTokenUsageSnapshot),
-                    typeof(DateTime)
-                },
-                null);
-            Assert.That(method, Is.Not.Null);
             var state = new AppServerAuthenticationState
             {
                 IsAuthenticated = true,
@@ -432,9 +496,7 @@ namespace MyCodex.Application.Tests
                 Email = "demo@example.com",
                 PlanType = "pro"
             };
-            return (List<string>)method.Invoke(
-                null,
-                new object[] { state, snapshot, usage, new DateTime(2026, 6, 5, 17, 0, 0) });
+            return UserCenterDetailsFormatter.BuildDetailLines(state, snapshot, usage, new DateTime(2026, 6, 5, 17, 0, 0));
         }
     }
 }

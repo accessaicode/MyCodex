@@ -422,14 +422,8 @@
 <data name="UserCenterForm.Action.RefreshUserInfo" xml:space="preserve">
     <value>刷新用户信息</value>
   </data>
-<data name="UserCenterForm.Status.Refreshing" xml:space="preserve">
-    <value>正在刷新...</value>
-  </data>
 <data name="UserCenterForm.Status.RefreshCompleted" xml:space="preserve">
     <value>刷新完成</value>
-  </data>
-<data name="UserCenterForm.Status.RefreshFailed" xml:space="preserve">
-    <value>刷新失败</value>
   </data>
 <data name="UserCenterForm.Status.RateLimitsUnavailable" xml:space="preserve">
     <value>用户信息已刷新，速率信息暂时不可用。</value>
@@ -14476,5 +14470,20 @@ MyCodex 桌面客户端。</value>
   </data>
 <data name="GitHubRepositoryList.Status.TruncatedUnknown.Template" xml:space="preserve">
     <value>仅加载了前 {0} 个仓库。</value>
+  </data>
+  <data name="UserCenterForm.Status.LoadingAccount" xml:space="preserve">
+    <value>正在加载信息…</value>
+  </data>
+  <data name="UserCenterForm.Status.AccountLoadFailed" xml:space="preserve">
+    <value>账号信息加载失败，请点击刷新重试。</value>
+  </data>
+  <data name="AuthenticationCenter.Error.PrepareAccountNetwork" xml:space="preserve">
+    <value>账号切换尚未开始。暂时无法连接认证服务，请检查网络后重试。</value>
+  </data>
+  <data name="AuthenticationCenter.Error.PrepareAccount" xml:space="preserve">
+    <value>账号切换尚未开始。暂时无法准备该账号的凭据，请检查账号状态后重试。</value>
+  </data>
+  <data name="AuthenticationCenter.Error.ReadOnlyFiles" xml:space="preserve">
+    <value>auth.json 或 config.toml 文件已设为只读。请取消文件的只读属性后重试。</value>
   </data>
 </root>

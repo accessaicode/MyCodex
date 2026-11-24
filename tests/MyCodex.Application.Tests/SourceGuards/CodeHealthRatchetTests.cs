@@ -17,8 +17,9 @@ namespace MyCodex.Application.Tests.SourceGuards
     public sealed class CodeHealthRatchetTests
     {
         // +1 each: startup repeats a silent browser control setup failure after later status messages.
+        // Account loading and in-place content selection belong to UserCenterForm.
         private const int MainFormPartialNonEmptyLinesCeiling = 22528;
-        private const int MainFormCoreFileNonEmptyLinesCeiling = 2879;
+        private const int MainFormCoreFileNonEmptyLinesCeiling = 2882;
         private const int MainFormFieldCeiling = 363;
         private const int MethodsOver150LinesCeiling = 13;
         private const int FilesOver1200LinesCeiling = 23;

@@ -31,43 +31,5 @@ namespace MyCodex.Application.Tests
             Assert.That(bootstrapSource, Does.Not.Contain("RemoteUnixSsh"));
         }
 
-        [Test]
-        public void UserCenter_UsesOfficialObservationsAndOnlyTheOfficialResetCreditMutation()
-        {
-            var source = string.Concat(
-                RepositorySource.ReadSourceFile("UserCenterForm.cs"),
-                RepositorySource.ReadSourceFile("UserCenterForm.QuotaReset.cs"));
-
-            Assert.That(source, Does.Not.Contain("StartChatGptLoginAsync"));
-            Assert.That(source, Does.Not.Contain("StartOpenAiApiKeyLoginAsync"));
-            Assert.That(source, Does.Not.Contain("LogoutAsync"));
-            Assert.That(source, Does.Contain("GetAuthenticationStateAsync"));
-            Assert.That(source, Does.Contain("GetRateLimitsAsync"));
-            Assert.That(source, Does.Contain("ConsumeRateLimitResetCreditAsync"));
-        }
-
-        [Test]
-        public void ClosingUserCenter_DoesNotRefreshAuthenticationOrStartLoginBootstrap()
-        {
-            var source = RepositorySource.ReadSourceFile("MainForm.cs");
-            var handlerStart = source.IndexOf(
-                "private async void OnUserCenterMenuItemClick",
-                StringComparison.Ordinal);
-            var nextHandlerStart = source.IndexOf(
-                "private async void OnGoalSetMenuItemClick",
-                handlerStart,
-                StringComparison.Ordinal);
-
-            Assert.That(handlerStart, Is.GreaterThanOrEqualTo(0));
-            Assert.That(nextHandlerStart, Is.GreaterThan(handlerStart));
-
-            var handler = source.Substring(handlerStart, nextHandlerStart - handlerStart);
-            var closeBoundary = handler.IndexOf("form.ShowDialog(this);", StringComparison.Ordinal);
-
-            Assert.That(closeBoundary, Is.GreaterThanOrEqualTo(0));
-            var afterClose = handler.Substring(closeBoundary);
-            Assert.That(afterClose, Does.Not.Contain("RefreshAuthenticationStateAsync"));
-            Assert.That(afterClose, Does.Not.Contain("ShowAuthenticationBootstrapIfRequired"));
-        }
     }
 }

@@ -228,6 +228,12 @@ namespace MyCodex.WinForms.Forms
                     return UiLocalization.Text("AuthenticationCenter.Error.Route", "This configuration is saved. Protocol conversion will be available in a later development stage.");
                 case "runtime_busy":
                     return UiLocalization.Text("AuthenticationCenter.Error.Busy", "Work or a configuration operation is active. Finish it before applying a provider; no work was stopped.");
+                case "account_prepare_network_failed":
+                    return UiLocalization.Text("AuthenticationCenter.Error.PrepareAccountNetwork", "The account switch has not started. The authentication service could not be reached. Check the connection and try again.");
+                case "account_prepare_failed":
+                    return UiLocalization.Text("AuthenticationCenter.Error.PrepareAccount", "The account switch has not started. Its credentials could not be prepared. Check the account state and try again.");
+                case "live_files_readonly":
+                    return UiLocalization.Text("AuthenticationCenter.Error.ReadOnlyFiles", "auth.json or config.toml is read-only. Clear the file's read-only attribute and try again.");
                 case "operation_unknown":
                 case "save_outcome_unknown":
                     return UiLocalization.Text("AuthenticationCenter.Error.UnknownOperation", "The application result could not be confirmed. Check the global configuration before starting another switch.");

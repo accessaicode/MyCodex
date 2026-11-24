@@ -39,6 +39,14 @@ namespace MyCodex.Application.Tests
         }
 
         [Test]
+        public void ReadOnlyFilesExplainWhichFilesNeedTheirAttributesCleared()
+        {
+            var text = AuthenticationCenterUiText.Error(new AuthenticationCenterException("live_files_readonly"));
+            Assert.That(text, Does.Contain("auth.json").And.Contain("config.toml"));
+            Assert.That(text, Is.Not.EqualTo(AuthenticationCenterUiText.Error(new AuthenticationCenterException("operation_unknown"))));
+        }
+
+        [Test]
         public void OnlyLinuxDependencyFailureSuggestsAptPackages()
         {
             var linux = AuthenticationCenterUiText.Error(new AuthenticationCenterException("backend_linux_dependencies_missing"));

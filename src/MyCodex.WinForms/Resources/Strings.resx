@@ -422,14 +422,8 @@ Selected credit: {0}</value>
 <data name="UserCenterForm.Action.RefreshUserInfo" xml:space="preserve">
     <value>Refresh user info</value>
   </data>
-<data name="UserCenterForm.Status.Refreshing" xml:space="preserve">
-    <value>Refreshing...</value>
-  </data>
 <data name="UserCenterForm.Status.RefreshCompleted" xml:space="preserve">
     <value>Refresh completed.</value>
-  </data>
-<data name="UserCenterForm.Status.RefreshFailed" xml:space="preserve">
-    <value>Refresh failed.</value>
   </data>
 <data name="UserCenterForm.Status.RateLimitsUnavailable" xml:space="preserve">
     <value>User info refreshed. Quota information is temporarily unavailable.</value>
@@ -14521,5 +14515,20 @@ Trust this host key and retry detection?</value></data>
   </data>
 <data name="GitHubRepositoryList.Status.TruncatedUnknown.Template" xml:space="preserve">
     <value>Only the first {0} repositories were loaded.</value>
+  </data>
+  <data name="UserCenterForm.Status.LoadingAccount" xml:space="preserve">
+    <value>Loading information…</value>
+  </data>
+  <data name="UserCenterForm.Status.AccountLoadFailed" xml:space="preserve">
+    <value>Account information could not be loaded. Refresh to try again.</value>
+  </data>
+  <data name="AuthenticationCenter.Error.PrepareAccountNetwork" xml:space="preserve">
+    <value>The account switch has not started. The authentication service could not be reached. Check the connection and try again.</value>
+  </data>
+  <data name="AuthenticationCenter.Error.PrepareAccount" xml:space="preserve">
+    <value>The account switch has not started. Its credentials could not be prepared. Check the account state and try again.</value>
+  </data>
+  <data name="AuthenticationCenter.Error.ReadOnlyFiles" xml:space="preserve">
+    <value>auth.json or config.toml is read-only. Clear the file's read-only attribute and try again.</value>
   </data>
 </root>
